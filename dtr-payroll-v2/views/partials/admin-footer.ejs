@@ -1,0 +1,20 @@
+  </div><!-- end content-area -->
+</main>
+
+<script>
+  // Current date display
+  const now = new Date();
+  document.getElementById('currentDate').textContent = now.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Sidebar toggle
+  const toggle = document.getElementById('menuToggle');
+  const sidebar = document.getElementById('sidebar');
+  if (toggle) toggle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+
+  // Auto-dismiss alerts
+  setTimeout(() => {
+    document.querySelectorAll('.alert').forEach(el => el.style.opacity = '0');
+  }, 4000);
+</script>
+</body>
+</html>

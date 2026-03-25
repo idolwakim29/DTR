@@ -1,0 +1,81 @@
+<%- include('../partials/admin-header') %>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-users" style="color:var(--red);margin-right:8px"></i>User Management</h3>
+    <a href="/admin/users/new" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add User</a>
+  </div>
+  <div class="card-body">
+    <form method="GET" class="filter-bar">
+      <input type="text" name="search" class="form-control search-input" placeholder="Search name or ID..." value="<%= search || '' %>">
+      <select name="role" class="form-select" style="width:180px">
+        <option value="">All Roles</option>
+        <option value="maintenance" <%= role === 'maintenance' ? 'selected' : '' %>>Maintenance</option>
+        <option value="student" <%= role === 'student' ? 'selected' : '' %>>Student</option>
+      </select>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Filter</button>
+      <a href="/admin/users" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
+    </form>
+
+    <div class="table-wrap">
+      <% if (users.length === 0) { %>
+        <div class="empty-state"><i class="fas fa-users"></i><p>No users found</p></div>
+      <% } else { %>
+      <table>
+        <thead>
+          <tr>
+            <th>User ID</th>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Department</th>
+            <th>Hourly Rate</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach(u => { %>
+          <tr>
+            <td><code><%= u.userId %></code></td>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:32px;height:32px;border-radius:8px;background:var(--red-pale);color:var(--red);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">
+                  <%= u.name.charAt(0).toUpperCase() %>
+                </div>
+                <div>
+                  <strong><%= u.name %></strong>
+                  <% if (u.email) { %><br><small style="color:var(--gray-600)"><%= u.email %></small><% } %>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="badge <%= u.role === 'student' ? 'badge-blue' : 'badge-orange' %>">
+                <i class="fas <%= u.role === 'student' ? 'fa-user-graduate' : 'fa-hard-hat' %>"></i>
+                <%= u.role.charAt(0).toUpperCase() + u.role.slice(1) %>
+              </span>
+            </td>
+            <td><%= u.department || '—' %></td>
+            <td><strong style="color:var(--success)">₱<%= u.hourlyRate.toFixed(2) %>/hr</strong></td>
+            <td>
+              <span class="badge <%= u.isActive ? 'badge-green' : 'badge-gray' %>">
+                <%= u.isActive ? 'Active' : 'Inactive' %>
+              </span>
+            </td>
+            <td>
+              <div style="display:flex;gap:6px">
+                <a href="/admin/users/edit/<%= u._id %>" class="btn btn-sm btn-secondary"><i class="fas fa-edit"></i></a>
+                <form action="/admin/users/delete/<%= u._id %>" method="POST" onsubmit="return confirm('Delete this user?')">
+                  <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/admin-footer') %>

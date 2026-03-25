@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error | CJC DTR</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f1f3f5">
+<div style="text-align:center;padding:40px">
+  <div style="font-size:64px;color:#C0392B;margin-bottom:16px"><i class="fas fa-exclamation-triangle"></i></div>
+  <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">Access Denied</h1>
+  <p style="color:#6c757d;margin-bottom:24px"><%= message || 'You do not have permission to view this page.' %></p>
+  <a href="javascript:history.back()" style="background:#C0392B;color:white;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+    <i class="fas fa-arrow-left"></i> Go Back
+  </a>
+</div>
+</body>
+</html>
