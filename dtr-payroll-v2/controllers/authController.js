@@ -22,6 +22,10 @@ exports.postLogin = async (req, res) => {
       req.flash('error', 'Invalid User ID or password.');
       return res.redirect('/login');
     }
+    if (user.role !== 'admin') {
+      req.flash('error', 'This login is for administrators only. Please use the kiosk to record attendance.');
+      return res.redirect('/login');
+    }
     req.session.user = {
       _id: user._id,
       userId: user.userId,

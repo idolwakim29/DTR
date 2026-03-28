@@ -54,24 +54,6 @@ exports.postKiosk = async (req, res) => {
         userName: user.name, userId: user.userId, userType: user.role, action: 'time-in', todayLog: log });
     }
 
-    // ── LUNCH BREAK ──────────────────────────
-    if (action === 'lunch-break') {
-      if (!log || !log.isActive) {
-        return res.json({ success: false, message: 'You are not clocked in.' });
-      }
-      if (log.status === 'completed') {
-        return res.json({ success: false, message: 'Your shift is already completed.' });
-      }
-      const now = new Date();
-      if (log.sessions.length === 0) { log.timeOut = now; }
-      else { const last = log.sessions[log.sessions.length - 1]; if (!last.timeOut) last.timeOut = now; }
-      log.isActive = false;
-      log.status   = 'on-break';
-      await log.save();
-      return res.json({ success: true, message: 'Lunch break started. Remember to clock back in!',
-        userName: user.name, userId: user.userId, userType: user.role, action: 'lunch-break', todayLog: log });
-    }
-
     // ── TIME OUT ─────────────────────────────
     if (action === 'time-out') {
       if (!log || !log.timeIn) {
@@ -171,27 +153,6 @@ exports.timeIn = async (req, res) => {
   } catch (err) {
     console.error(err);
     req.flash('error', 'Error recording time in.');
-    res.redirect('/dtr');
-  }
-};
-
-exports.lunchBreak = async (req, res) => {
-  const { userId } = req.session.user;
-  const today = moment().format('YYYY-MM-DD');
-  try {
-    const log = await DTRLog.findOne({ userId, date: today });
-    if (!log || !log.isActive) { req.flash('error', 'You are not clocked in.'); return res.redirect('/dtr'); }
-    const now = new Date();
-    if (log.sessions.length === 0) { log.timeOut = now; }
-    else { const last = log.sessions[log.sessions.length - 1]; if (!last.timeOut) last.timeOut = now; }
-    log.isActive = false;
-    log.status   = 'on-break';
-    await log.save();
-    req.flash('success', 'Enjoy your lunch break! Remember to clock back in.');
-    res.redirect('/dtr');
-  } catch (err) {
-    console.error(err);
-    req.flash('error', 'Error recording lunch break.');
     res.redirect('/dtr');
   }
 };

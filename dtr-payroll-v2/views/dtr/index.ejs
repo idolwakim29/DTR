@@ -52,7 +52,7 @@
     <div style="padding: 0 22px 2px;">
       <div style="background:var(--info-pale);border:1px solid #93C5FD;border-radius:9px;padding:10px 13px;font-size:12.5px;color:#1E40AF;display:flex;gap:8px;align-items:flex-start;line-height:1.45;">
         <i class="fas fa-info-circle" style="margin-top:1px;flex-shrink:0;"></i>
-        <span>Use <strong>Lunch Break</strong> if you're leaving for lunch — you can Time In again after. Use <strong>Time Out</strong> only when ending your shift.</span>
+        <span>Lunch break (12:00 PM - 1:00 PM) is automatically excluded from working hours. Use <strong>Time In</strong> to start your shift and <strong>Time Out</strong> to end it.</span>
       </div>
     </div>
 
@@ -90,12 +90,7 @@
           <span class="dtr-log-value"><%= todayLog.sessions.length + 1 %> session(s) today</span>
         </div>
         <% } %>
-        <% if (todayLog && todayLog.status === 'on-break') { %>
-        <div class="dtr-log-row">
-          <span class="dtr-log-label"><i class="fas fa-coffee" style="color:var(--warning);margin-right:5px"></i>Status</span>
-          <span class="dtr-log-value"><span class="badge badge-orange">On Lunch Break</span></span>
-        </div>
-        <% } %>
+
         <% if (todayLog && todayLog.totalHours > 0) { %>
         <div class="dtr-log-row">
           <span class="dtr-log-label"><i class="fas fa-clock" style="color:var(--info);margin-right:5px"></i>Hours Worked</span>
@@ -116,19 +111,12 @@
     <!-- Actions -->
     <div class="dtr-actions">
       <%
-        const canTimeIn   = !todayLog || !todayLog.timeIn || (todayLog.status === 'on-break');
-        const canLunch    = todayLog && todayLog.isActive && todayLog.status !== 'completed' && todayLog.status !== 'on-break';
-        const canTimeOut  = todayLog && todayLog.isActive && todayLog.status !== 'completed' && todayLog.status !== 'on-break';
+        const canTimeIn   = !todayLog || !todayLog.timeIn;
+        const canTimeOut  = todayLog && todayLog.isActive && todayLog.status !== 'completed';
       %>
       <form action="/dtr/time-in" method="POST">
         <button type="submit" class="dtr-btn dtr-btn-in <%= canTimeIn ? '' : 'disabled' %>" <%= canTimeIn ? '' : 'disabled' %>>
-          <i class="fas fa-sign-in-alt"></i>
-          <%= (todayLog && todayLog.status === 'on-break') ? 'Return from Lunch' : 'Time In' %>
-        </button>
-      </form>
-      <form action="/dtr/lunch-break" method="POST">
-        <button type="submit" class="dtr-btn dtr-btn-lunch <%= canLunch ? '' : 'disabled' %>" <%= canLunch ? '' : 'disabled' %>>
-          <i class="fas fa-utensils"></i> Lunch Break
+          <i class="fas fa-sign-in-alt"></i> Time In
         </button>
       </form>
       <form action="/dtr/time-out" method="POST">

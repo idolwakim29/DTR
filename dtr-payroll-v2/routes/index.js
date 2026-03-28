@@ -19,7 +19,6 @@ router.get('/dtr/kiosk/recent',dtrController.getRecentLogs);
 // Session-based DTR (logged-in staff/students)
 router.get('/dtr/me',              isAuthenticated, isStaff, dtrController.getDTRPage);
 router.post('/dtr/time-in',        isAuthenticated, isStaff, dtrController.timeIn);
-router.post('/dtr/lunch-break',    isAuthenticated, isStaff, dtrController.lunchBreak);
 router.post('/dtr/time-out',       isAuthenticated, isStaff, dtrController.timeOut);
 
 // Admin – Dashboard

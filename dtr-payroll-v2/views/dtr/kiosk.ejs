@@ -64,8 +64,7 @@ body { background: var(--gray-100); min-height: 100vh; display: flex; flex-direc
     .kbtn:disabled{ opacity: .38; cursor: not-allowed; transform: none !important; }
     .kbtn-in    { background: var(--red);          color: var(--white); }
     .kbtn-in:hover:not(:disabled) { background: var(--red-dark); }
-    .kbtn-lunch { background: var(--warning-pale); color: var(--warning); border: 1.5px solid #FCD34D; }
-    .kbtn-lunch:hover:not(:disabled) { background: #FDE68A; }
+
     .kbtn-out   { background: var(--dark);         color: var(--white); }
     .kbtn-out:hover:not(:disabled) { background: var(--gray-700); }
     .kbtn-undo  { background: var(--gray-100);     color: var(--gray-700); border: 1.5px solid var(--gray-200); font-size: 12px; }
@@ -89,10 +88,12 @@ body { background: var(--gray-100); min-height: 100vh; display: flex; flex-direc
   flex-shrink: 0; align-self: flex-start;
   margin-left: 0;
 }
+
 .emp-card.visible {
   width: 280px;
   opacity: 1; pointer-events: auto;
   margin-left: 20px;
+  align-self: center;
 }
   /* AFTER */
 .dtr-layout { display: flex; align-items: center; justify-content: center; gap: 20px; width: 100%; }
@@ -119,7 +120,7 @@ body { background: var(--gray-100); min-height: 100vh; display: flex; flex-direc
     .emp-stamp      { margin: 0 18px 14px; padding: 9px 12px; border-radius: 9px; text-align: center; font-size: 13px; font-weight: 700; display: none; }
     .emp-stamp.in   { background: var(--success-pale); color: var(--success); }
     .emp-stamp.out  { background: var(--danger-pale);  color: var(--danger); }
-    .emp-stamp.lunch{ background: var(--warning-pale); color: var(--warning); }
+
 
     /* OT/UT summary in emp card */
     .emp-otut       { margin: 0 18px 14px; display: flex; gap: 8px; justify-content: center; }
@@ -150,7 +151,7 @@ body { background: var(--gray-100); min-height: 100vh; display: flex; flex-direc
 
   <main class="main">
     <div class="dtr-layout">
-
+<div style="display:flex; align-items:center;"></div>
       <!-- FORM CARD -->
       <div class="fcard">
         <div class="fcard-accent"></div>
@@ -161,7 +162,7 @@ body { background: var(--gray-100); min-height: 100vh; display: flex; flex-direc
           <!-- Reminder banner -->
           <div class="reminder">
             <i class="fas fa-info-circle"></i>
-            <span>Use <strong>Time In</strong> to start your shift. Use <strong>Lunch Break</strong> when leaving for lunch, then <strong>Time In</strong> again when you return. <strong>Time Out</strong> ends your shift.</span>
+            <span>Lunch break (12:00 PM - 1:00 PM) is automatically excluded from working hours. Use <strong>Time In</strong> to start your shift and <strong>Time Out</strong> to end it.</span>
           </div>
 
           <div id="alertBox"></div>
@@ -188,12 +189,9 @@ body { background: var(--gray-100); min-height: 100vh; display: flex; flex-direc
             <input type="text" id="liveTime" readonly value="--:--:--">
           </div>
 
-          <div class="btn-grid-3" id="btnRow">
+          <div class="btn-grid" id="btnRow">
             <button class="kbtn kbtn-in"    id="btnIn"    onclick="doSubmit('time-in')">
               <i class="fas fa-sign-in-alt"></i> Time In
-            </button>
-            <button class="kbtn kbtn-lunch" id="btnLunch" onclick="doSubmit('lunch-break')">
-              <i class="fas fa-utensils"></i> Lunch
             </button>
             <button class="kbtn kbtn-out"   id="btnOut"   onclick="doSubmit('time-out')">
               <i class="fas fa-sign-out-alt"></i> Time Out
@@ -398,9 +396,6 @@ body { background: var(--gray-100); min-height: 100vh; display: flex; flex-direc
     if (action === 'time-in' || action === 'resume') {
       stamp.className = 'emp-stamp in';
       stamp.innerHTML = `<i class="fas fa-sign-in-alt"></i> Timed In at ${fmt(new Date())}`;
-    } else if (action === 'lunch-break') {
-      stamp.className = 'emp-stamp lunch';
-      stamp.innerHTML = `<i class="fas fa-utensils"></i> Lunch Break at ${fmt(new Date())}`;
     } else if (action === 'time-out') {
       stamp.className = 'emp-stamp out';
       stamp.innerHTML = `<i class="fas fa-sign-out-alt"></i> Timed Out at ${fmt(new Date())}`;
@@ -416,7 +411,7 @@ body { background: var(--gray-100); min-height: 100vh; display: flex; flex-direc
 
   // ── Helpers ──
   function setBtns(d) {
-    ['btnIn','btnLunch','btnOut'].forEach(id => document.getElementById(id).disabled = d);
+    ['btnIn','btnOut'].forEach(id => document.getElementById(id).disabled = d);
   }
   function showAlert(type, msg) {
     document.getElementById('alertBox').innerHTML =
