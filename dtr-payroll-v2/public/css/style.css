@@ -198,7 +198,7 @@ tbody tr:hover { background: var(--gray-50); }
   width: var(--sidebar-w); background: var(--navy);
   display: flex; flex-direction: column;
   position: fixed; top: 0; left: 0; height: 100vh;
-  z-index: 200; transition: transform .25s;
+  z-index: 200; transition: transform .25s; box-shadow: none;
 }
 .sidebar.collapsed { transform: translateX(-100%); }
 
