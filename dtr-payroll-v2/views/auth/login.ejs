@@ -8,8 +8,38 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .login-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 420px;
+      margin: 20px auto 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      box-shadow: 0 4px 10px rgba(0,0,0,.08);
+    }
+    .login-topbar .brand { display: flex; align-items: center; gap: 10px; }
+    .login-topbar .brand img { width: 28px; height: 28px; border-radius: 5px; }
+    .login-topbar .brand-name { font-weight: 700; color: var(--dark); font-size: 14px; }
+    .login-topbar .brand-sub { font-size: 11px; color: var(--gray-500); line-height: 1; }
+    .login-topbar .date-display { font-size: 12.5px; color: var(--gray-500); display: flex; align-items: center; gap: 6px; }
+  </style>
 </head>
 <body class="login-page">
+
+<div class="login-topbar">
+  <div class="brand">
+    <img src="/images/logo.png" alt="CJC Logo">
+    <div>
+      <div class="brand-name">Cor Jesu College</div>
+      <div class="brand-sub">Attendance System</div>
+    </div>
+  </div>
+  <div class="date-display"><i class="far fa-calendar"></i> <span id="headerDate"></span></div>
+</div>
 
 <!-- AFTER -->
 <div class="login-card" style="overflow:hidden;padding-top:0;">
@@ -81,6 +111,13 @@
   }
   // Auto dismiss error
   setTimeout(() => document.querySelectorAll('.alert').forEach(el => el.style.opacity='0'), 5000);
+
+  function updateHeaderDate() {
+    const now = new Date();
+    document.getElementById('headerDate').textContent = now.toLocaleDateString('en-PH', { weekday:'long', year:'numeric', month:'long', day:'numeric'});
+  }
+  updateHeaderDate();
+  setInterval(updateHeaderDate, 60000);
 </script>
 </body>
 </html>
