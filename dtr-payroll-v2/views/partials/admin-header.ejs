@@ -67,6 +67,16 @@
       </div>
     </header>
 
+    <!-- School branding header -->
+    <div style="background: var(--white); border-bottom: 1px solid var(--gray-200); padding: 20px 24px; margin-bottom: 0;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <img src="/images/logo.png" alt="" style="width:20px;height:20px;border-radius:4px;">
+        <div style="font-size: 16px; font-weight: 700; color: var(--dark);">Cor Jesu College</div>
+      </div>
+      <h2 style="font-size: 18px; font-weight: 800; color: var(--dark); margin: 0; margin-bottom: 4px;"><%= title %></h2>
+      <p style="font-size: 13px; color: var(--gray-500); margin: 0;">DTR Administration System</p>
+    </div>
+
     <div class="content-area">
       <% if (typeof error !== 'undefined' && error && error.length > 0) { %>
         <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <%= error %></div>
