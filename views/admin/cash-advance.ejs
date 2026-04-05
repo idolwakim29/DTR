@@ -1,0 +1,99 @@
+<%- include('../partials/admin-header') %>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+    <h3 class="card-title"><i class="fas fa-hand-holding-usd" style="color:var(--primary);margin-right:8px"></i>Cash Advances</h3>
+    <button class="btn btn-primary" onclick="document.getElementById('addAdvanceModal').style.display='block'">
+      <i class="fas fa-plus"></i> Add Advance
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Date Requested</th>
+          <th>Employee</th>
+          <th>Amount</th>
+          <th>Target Payroll Date</th>
+          <th>Status</th>
+          <th>Notes</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (advances.length === 0) { %>
+          <tr><td colspan="7" style="text-align:center;">No cash advances found.</td></tr>
+        <% } %>
+        <% advances.forEach(ca => { %>
+        <tr>
+          <td><%= new Date(ca.dateRequested).toLocaleDateString() %></td>
+          <td>
+            <% if (ca.employeeId) { %>
+              <strong><%= ca.employeeId.name %></strong><br>
+              <small style="color:var(--gray-500)"><%= ca.employeeId.userId %></small>
+            <% } else { %>
+              <span style="color:var(--gray-500)">Unknown User</span>
+            <% } %>
+          </td>
+          <td><strong>₱<%= ca.amount.toFixed(2) %></strong></td>
+          <td><%= new Date(ca.targetPayrollDate).toLocaleDateString() %></td>
+          <td>
+            <% if (ca.status === 'pending') { %>
+              <span class="badge badge-red">Pending</span>
+            <% } else { %>
+              <span class="badge badge-green">Deducted</span>
+            <% } %>
+          </td>
+          <td><span style="color:var(--gray-500); font-size: 0.9em;"><%= ca.notes || '-' %></span></td>
+          <td>
+            <% if (ca.status === 'pending') { %>
+              <form action="/admin/cash-advances/deduct/<%= ca._id %>" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-sm btn-outline"><i class="fas fa-check"></i> Mark Deducted</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Advance Modal Elements (Simple custom modal) -->
+<div id="addAdvanceModal" class="modal" style="display:none; position:fixed; z-index:999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5);">
+  <div class="modal-content" style="background-color:#fff; margin:10% auto; padding:20px; border-radius:8px; width:400px; max-width:90%;">
+    <h3 style="margin-top:0;">Add Cash Advance</h3>
+    <form action="/admin/cash-advances" method="POST">
+      <div class="form-group" style="margin-bottom:15px;">
+        <label>Employee</label>
+        <select name="employeeId" class="form-control" required style="width:100%; padding:8px;">
+          <option value="">Select Employee...</option>
+          <% users.forEach(u => { %>
+            <option value="<%= u._id %>"><%= u.name %> (<%= u.userId %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:15px;">
+        <label>Amount</label>
+        <input type="number" name="amount" min="1" step="0.01" class="form-control" required style="width:100%; padding:8px;">
+      </div>
+      <div class="form-group" style="margin-bottom:15px;">
+        <label>Target Payroll Date</label>
+        <input type="date" name="targetPayrollDate" class="form-control" required style="width:100%; padding:8px;">
+      </div>
+      <div class="form-group" style="margin-bottom:15px;">
+        <label>Notes</label>
+        <textarea name="notes" class="form-control" rows="2" style="width:100%; padding:8px;"></textarea>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('addAdvanceModal').style.display='none'">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Advance</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('../partials/admin-footer') %>

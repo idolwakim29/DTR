@@ -1,0 +1,97 @@
+<%- include('../partials/admin-header') %>
+
+<div class="card" style="max-width:580px">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-file-invoice-dollar" style="color:var(--red);margin-right:8px"></i>Generate Payroll</h3>
+    <a href="/admin/payroll" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Back</a>
+  </div>
+  <div class="card-body">
+    <% if (error && error.length > 0) { %>
+      <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <%= error %></div>
+    <% } %>
+
+    <div style="background:var(--red-pale);border:1px solid #F1948A;border-radius:10px;padding:14px;margin-bottom:20px;font-size:13px;color:var(--red-dark)">
+      <i class="fas fa-info-circle"></i>
+      <strong>How it works:</strong> Select an employee and period. The system will calculate total hours from completed DTR logs within the date range, then multiply by their hourly rate.
+    </div>
+
+    <form action="/admin/payroll/generate" method="POST">
+      <div class="form-group">
+        <label class="form-label">Employee *</label>
+        <select name="userId" class="form-select" required>
+          <option value="">Select Employee</option>
+          <% const maintenance = users.filter(u => u.role === 'maintenance'); %>
+          <% const students = users.filter(u => u.role === 'student'); %>
+          <% if (maintenance.length > 0) { %>
+          <optgroup label="Maintenance Staff">
+            <% maintenance.forEach(u => { %>
+              <option value="<%= u._id %>"><%= u.name %> (<%= u.userId %>) — ₱<%= u.hourlyRate.toFixed(2) %>/hr</option>
+            <% }) %>
+          </optgroup>
+          <% } %>
+          <% if (students.length > 0) { %>
+          <optgroup label="Students">
+            <% students.forEach(u => { %>
+              <option value="<%= u._id %>"><%= u.name %> (<%= u.userId %>) — ₱<%= u.hourlyRate.toFixed(2) %>/hr</option>
+            <% }) %>
+          </optgroup>
+          <% } %>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Period Type *</label>
+        <select name="periodType" class="form-select" required id="periodType" onchange="setPeriodDates(this.value)">
+          <option value="">Select Period</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Period Start *</label>
+          <input type="date" name="periodStart" class="form-control" id="periodStart" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Period End *</label>
+          <input type="date" name="periodEnd" class="form-control" id="periodEnd" required>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-calculator"></i> Generate Payroll</button>
+        <a href="/admin/payroll" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function setPeriodDates(type) {
+  const today = new Date();
+  const fmt = d => d.toISOString().slice(0,10);
+  const start = document.getElementById('periodStart');
+  const end   = document.getElementById('periodEnd');
+
+  if (type === 'daily') {
+    start.value = fmt(today);
+    end.value = fmt(today);
+  } else if (type === 'weekly') {
+    const day = today.getDay();
+    const monday = new Date(today); monday.setDate(today.getDate() - day + (day === 0 ? -6 : 1));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    start.value = fmt(monday);
+    end.value = fmt(sunday);
+  } else if (type === 'monthly') {
+    const ms = new Date(today.getFullYear(), today.getMonth(), 1);
+    const me = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    start.value = fmt(ms);
+    end.value = fmt(me);
+  }
+  }
+}
+</script>
+
+<%- include('../partials/admin-footer') %>

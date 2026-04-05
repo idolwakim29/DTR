@@ -1,0 +1,78 @@
+<%- include('../partials/admin-header') %>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-user-times" style="color:var(--red);margin-right:8px"></i>Absence Summary Report</h3>
+  </div>
+  <div class="filter-bar">
+    <form method="GET" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;width:100%;">
+      <select name="type" class="form-select" style="width:160px" onchange="this.form.submit()">
+        <option value="all"         <%= type === 'all'         ? 'selected' : '' %>>All Types</option>
+        <option value="student"     <%= type === 'student'     ? 'selected' : '' %>>Student</option>
+        <option value="maintenance" <%= type === 'maintenance' ? 'selected' : '' %>>Maintenance</option>
+      </select>
+      <input type="date" name="from" class="form-control" style="width:160px" value="<%= dateFrom %>">
+      <input type="date" name="to"   class="form-control" style="width:160px" value="<%= dateTo %>">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
+      <a href="/admin/absences?type=<%= type %>" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
+    </form>
+  </div>
+</div>
+
+<% if (reports.length === 0) { %>
+  <div class="card">
+    <div class="empty-state"><i class="fas fa-user-times"></i><p>No records found for the selected period.</p></div>
+  </div>
+<% } else { %>
+
+<!-- Absence Summary Table -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Period: <%= dateFrom %> to <%= dateTo %></h3>
+    <span class="badge badge-gray"><%= reports.length %> employee(s)</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Scheduled Days</th>
+          <th>Absent Days</th>
+          <th>Absence Rate %</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% reports.forEach(r => { %>
+        <tr>
+          <td>
+            <strong><%= r.name %></strong><br>
+            <small style="color:var(--gray-500)"><%= r.userId %></small>
+          </td>
+          <td><span class="badge badge-gray" style="text-transform: capitalize;"><%= r.role %></span></td>
+          <td><strong><%= r.scheduledDays %></strong></td>
+          <td>
+             <% if (r.absentDays > 0) { %>
+                <span class="badge badge-red"><%= r.absentDays %></span>
+             <% } else { %>
+                <span class="badge badge-green">0</span>
+             <% } %>
+          </td>
+          <td>
+             <% if (r.absenceRate > 0) { %>
+                <strong><%= r.absenceRate.toFixed(2) %>%</strong>
+             <% } else { %>
+                <span style="color:var(--gray-400)">0.00%</span>
+             <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<% } %>
+
+<%- include('../partials/admin-footer') %>

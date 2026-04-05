@@ -1,0 +1,102 @@
+<%- include('../partials/admin-header') %>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-user-graduate" style="color:var(--red);margin-right:8px"></i>Student DTR Logs</h3>
+    <a href="/admin/dtr/summary?userType=student" class="btn btn-outline btn-sm">
+      <i class="fas fa-chart-bar"></i> View Summary
+    </a>
+  </div>
+
+  <div class="filter-bar">
+    <form method="GET" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <input type="text" name="search" class="form-control" placeholder="Search name or ID..."
+        value="<%= search || '' %>" style="width:200px;">
+      <input type="date" name="dateFrom" class="form-control" value="<%= dateFrom || '' %>" style="width:160px;">
+      <input type="date" name="dateTo"   class="form-control" value="<%= dateTo   || '' %>" style="width:160px;">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
+      <a href="/admin/dtr/students" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    <% if (logs.length === 0) { %>
+      <div class="empty-state"><i class="fas fa-clipboard"></i><p>No DTR logs found.</p></div>
+    <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Date</th>
+          <th>Time In</th>
+          <th>Time Out</th>
+          <th>Sessions</th>
+          <th>Total Hrs</th>
+          <th>OT / UT</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% logs.forEach(log => { %>
+        <tr>
+          <td>
+            <strong><%= log.userName %></strong><br>
+            <small style="color:var(--gray-500)"><%= log.userId %></small>
+          </td>
+          <td><%= log.date %></td>
+          <td>
+            <% if (log.timeIn) { %>
+              <span class="badge badge-green"><%= new Date(log.timeIn).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}) %></span>
+              <% if (log.late_afternoon) { %><br><span class="badge badge-orange" style="margin-top:4px;font-size:10px;"><i class="fas fa-exclamation-triangle"></i> Late PM</span><% } %>
+            <% } else { %><span style="color:var(--gray-400)">—</span><% } %>
+          </td>
+          <td>
+            <% const lastOut = log.sessions && log.sessions.length > 0 ? log.sessions[log.sessions.length-1].timeOut : log.timeOut; %>
+            <% if (log.status === 'completed' && lastOut) { %>
+              <span class="badge badge-red"><%= new Date(lastOut).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}) %></span>
+            <% } else if (log.status === 'on-break') { %>
+              <span class="badge badge-orange">On Break</span>
+            <% } else { %><span style="color:var(--gray-400)">—</span><% } %>
+          </td>
+          <td>
+            <% if (log.sessions && log.sessions.length > 0) { %>
+              <span class="badge badge-gray"><%= log.sessions.length + 1 %> sessions</span>
+            <% } else { %>
+              <span style="color:var(--gray-400)">1</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (log.totalHours > 0) { %>
+              <strong><%= log.totalHours.toFixed(2) %> hrs</strong>
+            <% } else { %><span style="color:var(--gray-400)">—</span><% } %>
+          </td>
+          <td>
+            <% if (log.overtimeHours > 0) { %>
+              <span class="badge badge-green">+<%= log.overtimeHours.toFixed(2) %> OT</span>
+            <% } else if (log.undertimeHours > 0) { %>
+              <span class="badge badge-red">−<%= log.undertimeHours.toFixed(2) %> UT</span>
+            <% } else { %><span style="color:var(--gray-400)">—</span><% } %>
+          </td>
+          <td>
+            <span class="badge <%= log.status === 'completed' ? 'badge-green' : log.status === 'on-break' ? 'badge-orange' : 'badge-blue' %>">
+              <%= log.status === 'completed' ? 'Done' : log.status === 'on-break' ? 'Break' : 'Active' %>
+            </span>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;">
+              <a href="/admin/dtr/edit/<%= log._id %>" class="btn btn-sm btn-outline" title="Edit"><i class="fas fa-edit"></i></a>
+              <form action="/admin/dtr/delete/<%= log._id %>" method="POST" onsubmit="return confirm('Delete this log?')">
+                <button class="btn btn-sm btn-danger" title="Delete"><i class="fas fa-trash"></i></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>
+
+<%- include('../partials/admin-footer') %>

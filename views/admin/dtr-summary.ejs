@@ -1,0 +1,135 @@
+<%- include('../partials/admin-header') %>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-chart-bar" style="color:var(--red);margin-right:8px"></i>DTR Summary</h3>
+  </div>
+  <div class="filter-bar">
+    <form method="GET" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;width:100%;">
+      <select name="userType" class="form-select" style="width:160px" onchange="this.form.submit()">
+        <option value="student"     <%= userType === 'student'     ? 'selected' : '' %>>Students</option>
+        <option value="maintenance" <%= userType === 'maintenance' ? 'selected' : '' %>>Maintenance</option>
+      </select>
+      <select name="userId" class="form-select" style="width:220px">
+        <option value="">All Employees</option>
+        <% users.forEach(u => { %>
+          <option value="<%= u.userId %>" <%= userId === u.userId ? 'selected' : '' %>><%= u.name %> (<%= u.userId %>)</option>
+        <% }) %>
+      </select>
+      <input type="date" name="dateFrom" class="form-control" style="width:160px" value="<%= dateFrom %>">
+      <input type="date" name="dateTo"   class="form-control" style="width:160px" value="<%= dateTo %>">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
+      <a href="/admin/dtr/summary?userType=<%= userType %>" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
+    </form>
+  </div>
+</div>
+
+<% if (summaries.length === 0) { %>
+  <div class="card">
+    <div class="empty-state"><i class="fas fa-chart-bar"></i><p>No records found for the selected period.</p></div>
+  </div>
+<% } else { %>
+
+<!-- Summary Table -->
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Period: <%= dateFrom %> to <%= dateTo %></h3>
+    <span class="badge badge-gray"><%= summaries.length %> employee(s)</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Days Present</th>
+          <th>Completed</th>
+          <th>Incomplete</th>
+          <th>Total Hours</th>
+          <th>Overtime</th>
+          <th>Undertime</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% summaries.forEach(s => { %>
+        <tr>
+          <td>
+            <strong><%= s.userName %></strong><br>
+            <small style="color:var(--gray-500)"><%= s.userId %></small>
+          </td>
+          <td>
+            <strong><%= s.days %></strong>
+            <% if (s.lateAfternoonCount > 0) { %>
+              <br><span class="badge badge-orange" style="margin-top:4px;"><i class="fas fa-clock"></i> <%= s.lateAfternoonCount %> Late PM</span>
+            <% } %>
+          </td>
+          <td><span class="badge badge-green"><%= s.completedDays %></span></td>
+          <td>
+            <% if (s.incompleteDays > 0) { %>
+              <span class="badge badge-red"><%= s.incompleteDays %></span>
+            <% } else { %>
+              <span style="color:var(--gray-400)">0</span>
+            <% } %>
+          </td>
+          <td><strong><%= s.totalHours.toFixed(2) %> hrs</strong></td>
+          <td>
+            <% if (s.overtimeHours > 0) { %>
+              <span class="badge badge-green">+<%= s.overtimeHours.toFixed(2) %> hrs</span>
+            <% } else { %>
+              <span style="color:var(--gray-400)">—</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (s.undertimeHours > 0) { %>
+              <span class="badge badge-red">−<%= s.undertimeHours.toFixed(2) %> hrs</span>
+            <% } else { %>
+              <span style="color:var(--gray-400)">—</span>
+            <% } %>
+          </td>
+          <td>
+            <a href="/admin/dtr/<%= userType === 'student' ? 'students' : 'maintenance' %>?search=<%= s.userId %>"
+               class="btn btn-sm btn-outline">
+              <i class="fas fa-list"></i> Logs
+            </a>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Summary cards at a glance -->
+<div class="summary-grid" style="margin-top:20px;">
+  <% summaries.forEach(s => { %>
+  <div class="summary-card">
+    <div class="summary-card-name"><%= s.userName %></div>
+    <div class="summary-card-id"><%= s.userId %></div>
+    <div class="summary-stat-row">
+      <span class="summary-stat-label">Days Present</span>
+      <span class="summary-stat-val"><%= s.days %></span>
+    </div>
+    <div class="summary-stat-row">
+      <span class="summary-stat-label">Total Hours</span>
+      <span class="summary-stat-val"><%= s.totalHours.toFixed(2) %> hrs</span>
+    </div>
+    <% if (s.overtimeHours > 0) { %>
+    <div class="summary-stat-row">
+      <span class="summary-stat-label">Overtime</span>
+      <span class="summary-stat-val ot">+<%= s.overtimeHours.toFixed(2) %> hrs</span>
+    </div>
+    <% } %>
+    <% if (s.undertimeHours > 0) { %>
+    <div class="summary-stat-row">
+      <span class="summary-stat-label">Undertime</span>
+      <span class="summary-stat-val ut">−<%= s.undertimeHours.toFixed(2) %> hrs</span>
+    </div>
+    <% } %>
+  </div>
+  <% }) %>
+</div>
+
+<% } %>
+
+<%- include('../partials/admin-footer') %>
