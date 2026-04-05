@@ -35,19 +35,18 @@ app.use(methodOverride('_method'));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ✅ Sessions — now stored in MongoDB (survives Vercel cold starts)
+// ✅ REPLACE your entire session block with this:
 app.use(session({
   secret: process.env.SESSION_SECRET || 'cjc_secret',
   resave: false,
   saveUninitialized: false,
-  // ✅ CRITICAL: Without MongoStore, sessions reset on every Vercel redeploy
   store: MongoStore.create({
     mongoUrl: process.env.MONGODB_URI,
-    ttl: 8 * 60 * 60,        // 8 hours (matches cookie)
-    autoRemove: 'native'      // auto-clean expired sessions
+    ttl: 8 * 60 * 60,
+    autoRemove: 'native'
   }),
   cookie: {
-    maxAge: 8 * 60 * 60 * 1000, // 8 hours
-    // ✅ Required for Vercel HTTPS
+    maxAge: 8 * 60 * 60 * 1000,
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: 'lax'
