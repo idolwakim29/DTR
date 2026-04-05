@@ -10,6 +10,7 @@ const connectDB = require('./config/database');
 const routes = require('./routes/index');
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Connect to MongoDB and ensure a built-in admin exists
 connectDB()

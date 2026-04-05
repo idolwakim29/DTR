@@ -23,17 +23,29 @@ exports.postLogin = async (req, res) => {
       return res.redirect('/login');
     }
     if (user.role !== 'admin') {
-      req.flash('error', 'This login is for administrators only. Please use the kiosk to record attendance.');
+      req.flash('error', 'This login is for administrators only.');
       return res.redirect('/login');
     }
+
+    // ✅ Set session
     req.session.user = {
       _id: user._id,
       userId: user.userId,
       name: user.name,
       role: user.role
     };
-    if (user.role === 'admin') return res.redirect('/admin/dashboard');
-    return res.redirect('/dtr/me');
+
+    // ✅ CRITICAL FIX: Save session before redirecting on Vercel
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        req.flash('error', 'Session error. Please try again.');
+        return res.redirect('/login');
+      }
+      const redirectTo = user.role === 'admin' ? '/admin/dashboard' : '/dtr/me';
+      return res.redirect(redirectTo);
+    });
+
   } catch (err) {
     console.error(err);
     req.flash('error', 'Server error. Please try again.');
@@ -43,6 +55,9 @@ exports.postLogin = async (req, res) => {
 
 // GET /logout
 exports.logout = (req, res) => {
-  req.session.destroy();
-  res.redirect('/login');
+  // ✅ Fix logout — properly destroy session
+  req.session.destroy((err) => {
+    if (err) console.error('Logout error:', err);
+    res.redirect('/login');
+  });
 };
