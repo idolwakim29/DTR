@@ -1,15 +1,26 @@
-const CashAdvance = require('../models/CashAdvance');
-const User = require('../models/User');
+const prisma = require('../prismaClient');
 
 exports.getList = async (req, res) => {
   try {
-    const advances = await CashAdvance.find().populate('employeeId').sort({ dateRequested: -1 });
-    const users = await User.find({ role: { $ne: 'admin' }, isActive: true });
+    const advances = await prisma.cashAdvance.findMany({
+      include: { employee: true },
+      orderBy: { dateRequested: 'desc' }
+    });
+    const users = await prisma.user.findMany({
+      where: { role: { not: 'admin' }, isActive: true }
+    });
     
+    // Map employee safely if needed
+    const mappedAdvances = advances.map(a => ({
+      ...a,
+      _id: a.id,
+      employeeId: a.employee // mimicking mongoose populate
+    }));
+
     res.render('admin/cash-advance', {
       title: 'Cash Advances',
-      advances,
-      users,
+      advances: mappedAdvances,
+      users: users.map(u => ({ ...u, _id: u.id })),
       user: req.session.user,
       error: req.flash('error'),
       success: req.flash('success')
@@ -29,12 +40,14 @@ exports.postCreate = async (req, res) => {
       return res.redirect('/admin/cash-advances');
     }
 
-    await CashAdvance.create({
-      employeeId,
-      amount,
-      targetPayrollDate,
-      notes,
-      status: 'pending'
+    await prisma.cashAdvance.create({
+      data: {
+        employeeId,
+        amount: parseFloat(amount),
+        targetPayrollDate,
+        notes,
+        status: 'pending'
+      }
     });
 
     req.flash('success', 'Cash advance recorded successfully.');
@@ -48,12 +61,11 @@ exports.postCreate = async (req, res) => {
 
 exports.postMarkDeducted = async (req, res) => {
   try {
-    const ca = await CashAdvance.findById(req.params.id);
-    if (ca) {
-      ca.status = 'deducted';
-      await ca.save();
-      req.flash('success', 'Cash advance marked as deducted.');
-    }
+    await prisma.cashAdvance.update({
+      where: { id: req.params.id },
+      data: { status: 'deducted' }
+    });
+    req.flash('success', 'Cash advance marked as deducted.');
     res.redirect('/admin/cash-advances');
   } catch (err) {
     console.error(err);

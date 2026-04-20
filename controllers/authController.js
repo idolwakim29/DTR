@@ -1,4 +1,5 @@
-const User = require('../models/User');
+const prisma = require('../prismaClient');
+const bcrypt = require('bcryptjs');
 
 // GET /login
 exports.getLogin = (req, res) => {
@@ -12,12 +13,14 @@ exports.getLogin = (req, res) => {
 exports.postLogin = async (req, res) => {
   const { userId, password } = req.body;
   try {
-    const user = await User.findOne({ userId: userId.toUpperCase(), isActive: true });
+    const user = await prisma.user.findFirst({
+      where: { userId: userId.toUpperCase(), isActive: true }
+    });
     if (!user) {
       req.flash('error', 'Invalid User ID or password.');
       return res.redirect('/login');
     }
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       req.flash('error', 'Invalid User ID or password.');
       return res.redirect('/login');
@@ -27,15 +30,15 @@ exports.postLogin = async (req, res) => {
       return res.redirect('/login');
     }
 
-    // ✅ Set session
+    // Set session
     req.session.user = {
-      _id: user._id,
+      _id: user.id, // mapped to Prisma id
       userId: user.userId,
       name: user.name,
       role: user.role
     };
 
-    // ✅ CRITICAL FIX: Save session before redirecting on Vercel
+    // Save session before redirecting on Vercel
     req.session.save((err) => {
       if (err) {
         console.error('Session save error:', err);
@@ -55,7 +58,6 @@ exports.postLogin = async (req, res) => {
 
 // GET /logout
 exports.logout = (req, res) => {
-  // ✅ Fix logout — properly destroy session
   req.session.destroy((err) => {
     if (err) console.error('Logout error:', err);
     res.redirect('/login');
