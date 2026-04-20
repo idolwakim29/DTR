@@ -66,7 +66,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ✅ PostgreSQL Session Store (Fixes Vercel Crash)
 const dbPool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 app.use(session({
@@ -91,7 +94,7 @@ app.use(flash());
 // Global flash to locals
 app.use((req, res, next) => {
   res.locals.success = req.flash('success');
-  res.locals.error   = req.flash('error');
+  res.locals.error = req.flash('error');
   next();
 });
 
@@ -100,9 +103,9 @@ app.use('/', routes);
 
 // 404
 app.use((req, res) => {
-  res.status(404).render('error', { 
-    message: 'Page not found.', 
-    user: req.session.user || null 
+  res.status(404).render('error', {
+    message: 'Page not found.',
+    user: req.session.user || null
   });
 });
 
