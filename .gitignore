@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.local
+prisma/client/
+*.log
+*.txt
+*.xlsx
+prisma.config.ts.bak
+.vercel/
