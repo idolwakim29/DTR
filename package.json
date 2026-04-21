@@ -5,10 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "prisma generate",
+    "build": "npx prisma generate",
     "dev": "nodemon server.js",
-    "seed": "node config/seed.js",
-    "postinstall": "npx prisma generate"
+    "seed": "node config/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
