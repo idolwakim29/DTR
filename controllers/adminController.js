@@ -47,19 +47,14 @@ exports.getDashboard = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const { role, search } = req.query;
-    let query = { role: { $ne: 'admin' } };
-    if (role) query.role = role;
-    if (search) query.$or = [
-      { name: { $regex: search, $options: 'i' } },
-      { userId: { $regex: search, $options: 'i' } }
-    ];
-
     let mappedQuery = { role: { not: 'admin' } };
     if (role) mappedQuery.role = role;
-    if (search) mappedQuery.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { userId: { contains: search, mode: 'insensitive' } }
-    ];
+    if (search) {
+      mappedQuery.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { userId: { contains: search, mode: 'insensitive' } }
+      ];
+    }
     const users = await prisma.user.findMany({ where: mappedQuery, orderBy: { createdAt: 'desc' } });
     res.render('admin/users', { title: 'Users', users, role, search, user: req.session.user });
   } catch (err) {
@@ -109,16 +104,26 @@ exports.getEditUser = async (req, res) => {
 exports.postEditUser = async (req, res) => {
   try {
     const { name, email, role, department, hourlyRate, requiredHours, isActive, password } = req.body;
-    const user = await prisma.user.findUnique({ where: { id: req.params.id } });
-    user.name = name;
-    user.email = email;
-    user.role = role;
-    user.department = department;
-    user.hourlyRate = hourlyRate || 0;
-    user.requiredHours = requiredHours || 8;
-    user.isActive = isActive === 'on';
-    if (password && password.trim()) user.password = password;
-    await user.save();
+    const isActiveBool = isActive === 'on';
+    
+    const updateData = {
+      name,
+      email,
+      role,
+      department,
+      hourlyRate: parseFloat(hourlyRate) || 0,
+      requiredHours: parseFloat(requiredHours) || 8,
+      isActive: isActiveBool
+    };
+
+    if (password && password.trim()) {
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    await prisma.user.update({
+      where: { id: req.params.id },
+      data: updateData
+    });
     req.flash('success', 'User updated.');
     res.redirect('/admin/users');
   } catch (err) {
@@ -311,7 +316,7 @@ exports.exportPayrollExcel = async (req, res) => {
         end = targetDate.endOf('month').toDate();
       }
       if (start && end) {
-        query.periodStart = { $gte: start, $lte: end };
+        query.periodStart = { gte: startStr, lte: endStr }; // Assuming strings for stability as seen in generate
       }
     }
 
