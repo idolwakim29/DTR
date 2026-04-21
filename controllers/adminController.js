@@ -258,12 +258,13 @@ exports.markPaid = async (req, res) => {
 
 
     // Mark associated advances as deducted
-
-    // we just mark deductions during the same period as deducted
-    await prisma.cashAdvance.updateMany({
-      where: { employeeId: payroll.userId, status: 'pending' }, // rudimentary fix, real world needs the advance IDs
-      data: { status: 'deducted', deductedOn: new Date() }
-    });
+    const user = await prisma.user.findUnique({ where: { userId: payroll.userId } });
+    if (user) {
+      await prisma.cashAdvance.updateMany({
+        where: { employeeId: user.id, status: 'pending' },
+        data: { status: 'deducted', deductedOn: new Date() }
+      });
+    }
 
     req.flash('success', 'Payroll marked as paid.');
     res.redirect('/admin/payroll');

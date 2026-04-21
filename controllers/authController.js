@@ -32,7 +32,8 @@ exports.postLogin = async (req, res) => {
 
     // Set session
     req.session.user = {
-      _id: user.id, // mapped to Prisma id
+      id: user.id,   // native Prisma ID
+      _id: user.id,  // legacy compatibility
       userId: user.userId,
       name: user.name,
       role: user.role

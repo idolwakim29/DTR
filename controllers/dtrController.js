@@ -230,7 +230,12 @@ exports.getRecentLogs = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take: 8
     });
-    res.json({ logs });
+    // Mask userId for privacy on public endpoint
+    const maskedLogs = logs.map(l => ({
+      ...l,
+      userId: l.userId.substring(0, 3) + '****'
+    }));
+    res.json({ logs: maskedLogs });
   } catch (err) {
     res.json({ logs: [] });
   }
