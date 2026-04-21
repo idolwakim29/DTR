@@ -90,9 +90,6 @@ function calculateTotals(logData) {
 
 // PUBLIC KIOSK
 exports.getKiosk = (req, res) => {
-  if (req.session.user && req.session.user.role === 'admin') {
-    return res.redirect('/admin/dashboard');
-  }
   res.render('dtr/kiosk', { title: 'DTR Kiosk' });
 };
 
