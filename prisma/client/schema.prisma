@@ -1,0 +1,105 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "./client"
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  admin
+  maintenance
+  student
+}
+
+enum LogStatus {
+  in_progress @map("in-progress")
+  on_break    @map("on-break")
+  completed
+}
+
+enum CaStatus {
+  pending
+  deducted
+}
+
+model User {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  name          String
+  email         String?
+  password      String
+  role          Role
+  department    String?
+  hourlyRate    Float    @default(0)
+  requiredHours Float    @default(8)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  logs     DTRLog[]
+  advances CashAdvance[]
+}
+
+model DTRLog {
+  id             String    @id @default(uuid())
+  user_id        String
+  user           User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  userId         String
+  userName       String
+  userType       String
+  date           String
+  timeIn         DateTime?
+  timeOut        DateTime?
+  sessions       Json      @default("[]")
+  isActive       Boolean   @default(false)
+  totalHours     Float     @default(0)
+  requiredHours  Float     @default(8)
+  overtimeHours  Float     @default(0)
+  undertimeHours Float     @default(0)
+  status         LogStatus @default(in_progress)
+  late_afternoon Boolean   @default(false)
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model CashAdvance {
+  id                String   @id @default(uuid())
+  employeeId        String
+  employee          User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  amount            Float
+  targetPayrollDate String?
+  notes             String?
+  status            CaStatus @default(pending)
+  dateRequested     DateTime @default(now())
+}
+
+model Payroll {
+  id             String    @id @default(uuid())
+  userId         String
+  userName       String
+  periodStart    String
+  periodEnd      String
+  totalHours     Float
+  overtimeHours  Float
+  undertimeHours Float
+  grossPay       Float
+  deductions     Float     @default(0)
+  netPay         Float
+  isPaid         Boolean   @default(false)
+  paidOn         DateTime?
+  baseRate       Float     @default(0)
+  createdAt      DateTime  @default(now())
+}
+
+model session {
+  sid    String   @id @db.VarChar
+  sess   Json
+  expire DateTime @db.Timestamp(6)
+
+  @@index([expire], map: "IDX_session_expire")
+}

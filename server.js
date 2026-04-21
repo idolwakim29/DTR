@@ -7,10 +7,8 @@ const flash = require('connect-flash');
 const methodOverride = require('method-override');
 const morgan = require('morgan');
 const path = require('path');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('./prismaClient');
 const bcrypt = require('bcryptjs');
-
-const prisma = new PrismaClient();
 const routes = require('./routes/index');
 
 const app = express();
@@ -66,10 +64,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ✅ PostgreSQL Session Store (Fixes Vercel Crash)
 const dbPool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
 });
 
 app.use(session({

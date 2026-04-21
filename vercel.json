@@ -6,10 +6,13 @@
       "use": "@vercel/node",
       "config": {
         "includeFiles": [
-          "node_modules/.prisma/client/**",
-          "node_modules/@prisma/client/**",
+          "prisma/client/**",
           "views/**",
-          "public/**"
+          "public/**",
+          "routes/**",
+          "controllers/**",
+          "middleware/**",
+          "prismaClient.js"
         ]
       }
     }
