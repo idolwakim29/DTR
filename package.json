@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "build": "npx prisma generate",
+    "postinstall": "prisma generate",
     "dev": "nodemon server.js",
     "seed": "node config/seed.js"
   },
