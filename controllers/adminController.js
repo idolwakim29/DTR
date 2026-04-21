@@ -55,7 +55,8 @@ exports.getUsers = async (req, res) => {
         { userId: { contains: search, mode: 'insensitive' } }
       ];
     }
-    const users = await prisma.user.findMany({ where: mappedQuery, orderBy: { createdAt: 'desc' } });
+    const usersDocs = await prisma.user.findMany({ where: mappedQuery, orderBy: { createdAt: 'desc' } });
+    const users = usersDocs.map(u => ({ ...u, _id: u.id })); // Added _id for EJS compatibility
     res.render('admin/users', { title: 'Users', users, role, search, user: req.session.user });
   } catch (err) {
     console.error(err);
@@ -93,7 +94,9 @@ exports.postNewUser = async (req, res) => {
 // GET /admin/users/edit/:id
 exports.getEditUser = async (req, res) => {
   try {
-    const editUser = await prisma.user.findUnique({ where: { id: req.params.id } });
+    const userDoc = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!userDoc) return res.redirect('/admin/users');
+    const editUser = { ...userDoc, _id: userDoc.id };
     res.render('admin/user-form', { title: 'Edit User', editUser, user: req.session.user, error: req.flash('error') });
   } catch (err) {
     res.redirect('/admin/users');
