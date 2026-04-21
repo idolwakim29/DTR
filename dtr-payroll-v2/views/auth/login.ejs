@@ -1,14 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login | CJC DTR System</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body class="kiosk-page">
 
   <!-- ── Top Header Bar (matches kiosk page) ── -->
@@ -31,7 +34,9 @@
     <div class="login-card" style="overflow:hidden; padding-top:0;">
 
       <!-- Red accent bar -->
-      <div style="height:4px; background:linear-gradient(90deg,#C0392B,#E74C3C); width:calc(100% + 72px); margin-left:-36px; margin-bottom:32px;"></div>
+      <div
+        style="height:4px; background:linear-gradient(90deg,#C0392B,#E74C3C); width:calc(100% + 72px); margin-left:-36px; margin-bottom:32px;">
+      </div>
 
       <!-- Card title -->
       <div style="margin-bottom:22px;">
@@ -39,81 +44,81 @@
         <p style="font-size:13px; color:var(--gray-500);">CJC DTR System &mdash; Daily Time Record &amp; Payroll</p>
       </div>
 
-      <% if (error && error.length > 0) { %>
-        <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <%= error %></div>
-      <% } %>
-
-      <div class="login-divider"></div>
-
-      <form action="/login" method="POST">
-        <div class="form-group">
-          <label class="form-label" for="userId">
-            <i class="fas fa-id-badge" style="color:var(--red); margin-right:5px"></i> User ID
-          </label>
-          <input type="text" id="userId" name="userId" class="form-control"
-            placeholder="e.g. ADMIN001, MNT001, STD001"
-            required autofocus autocomplete="off"
-            style="text-transform:uppercase"
-            oninput="this.value=this.value.toUpperCase()">
-          <div class="pw-hint"><i class="fas fa-info-circle"></i> Enter your assigned employee or student ID</div>
+      <% if (error && error.length> 0) { %>
+        <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i>
+          <%= error %>
         </div>
+        <% } %>
 
-        <div class="form-group">
-          <label class="form-label" for="password">
-            <i class="fas fa-lock" style="color:var(--red); margin-right:5px"></i> Password
-          </label>
-          <div class="input-wrap">
-            <input type="password" id="password" name="password" class="form-control"
-              placeholder="Enter your password" required>
-            <button type="button" class="toggle-pw" onclick="togglePw()" title="Show/hide password">
-              <i class="fas fa-eye" id="pwIcon"></i>
+          <div class="login-divider"></div>
+
+          <form action="/login" method="POST">
+            <div class="form-group">
+              <label class="form-label" for="userId">
+                <i class="fas fa-id-badge" style="color:var(--red); margin-right:5px"></i> User ID
+              </label>
+              <input type="text" id="userId" name="userId" class="form-control" required autofocus autocomplete="off"
+                style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+              <div class="pw-hint"><i class="fas fa-info-circle"></i> Enter your assigned employee or student ID</div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="password">
+                <i class="fas fa-lock" style="color:var(--red); margin-right:5px"></i> Password
+              </label>
+              <div class="input-wrap">
+                <input type="password" id="password" name="password" class="form-control"
+                  placeholder="Enter your password" required>
+                <button type="button" class="toggle-pw" onclick="togglePw()" title="Show/hide password">
+                  <i class="fas fa-eye" id="pwIcon"></i>
+                </button>
+              </div>
+              <div class="pw-hint"><i class="fas fa-shield-alt"></i> Your password is case-sensitive</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary login-btn">
+              <i class="fas fa-sign-in-alt"></i> Sign In
             </button>
+          </form>
+
+          <div style="text-align:center; margin-top:18px;">
+            <a href="/" style="font-size:13px; color:var(--gray-600);">
+              <i class="fas fa-clock" style="margin-right:5px"></i>Go to Employee Panel
+            </a>
           </div>
-          <div class="pw-hint"><i class="fas fa-shield-alt"></i> Your password is case-sensitive</div>
-        </div>
 
-        <button type="submit" class="btn btn-primary login-btn">
-          <i class="fas fa-sign-in-alt"></i> Sign In
-        </button>
-      </form>
-
-      <div style="text-align:center; margin-top:18px;">
-        <a href="/" style="font-size:13px; color:var(--gray-600);">
-          <i class="fas fa-clock" style="margin-right:5px"></i>Go to Employee Panel
-        </a>
-      </div>
-
-      <div class="login-footer">
-        &copy; <%= new Date().getFullYear() %> Cor Jesu College, Inc. &mdash; All rights reserved
-      </div>
+          <div class="login-footer">
+            &copy; <%= new Date().getFullYear() %> Cor Jesu College, Inc. &mdash; All rights reserved
+          </div>
 
     </div>
   </main>
 
-<script>
-  function togglePw() {
-    const inp  = document.getElementById('password');
-    const icon = document.getElementById('pwIcon');
-    if (inp.type === 'password') {
-      inp.type = 'text';
-      icon.className = 'fas fa-eye-slash';
-    } else {
-      inp.type = 'password';
-      icon.className = 'fas fa-eye';
+  <script>
+    function togglePw() {
+      const inp = document.getElementById('password');
+      const icon = document.getElementById('pwIcon');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+      } else {
+        inp.type = 'password';
+        icon.className = 'fas fa-eye';
+      }
     }
-  }
 
-  // Auto dismiss error alerts after 5s
-  setTimeout(() => document.querySelectorAll('.alert').forEach(el => el.style.opacity = '0'), 5000);
+    // Auto dismiss error alerts after 5s
+    setTimeout(() => document.querySelectorAll('.alert').forEach(el => el.style.opacity = '0'), 5000);
 
-  function updateHeaderDate() {
-    const now = new Date();
-    document.getElementById('headerDate').textContent = now.toLocaleDateString('en-PH', {
-      weekday: 'short', year: 'numeric', month: 'long', day: 'numeric'
-    });
-  }
-  updateHeaderDate();
-  setInterval(updateHeaderDate, 60000);
-</script>
+    function updateHeaderDate() {
+      const now = new Date();
+      document.getElementById('headerDate').textContent = now.toLocaleDateString('en-PH', {
+        weekday: 'short', year: 'numeric', month: 'long', day: 'numeric'
+      });
+    }
+    updateHeaderDate();
+    setInterval(updateHeaderDate, 60000);
+  </script>
 </body>
+
 </html>
