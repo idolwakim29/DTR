@@ -154,7 +154,8 @@ exports.getPayroll = async (req, res) => {
     let query = {};
     if (userType) query.userType = userType;
     if (status) query.isPaid = status === 'paid';
-    const payrolls = await prisma.payroll.findMany({ where: query, orderBy: { createdAt: 'desc' } });
+    const payrollsDocs = await prisma.payroll.findMany({ where: query, orderBy: { createdAt: 'desc' } });
+    const payrolls = payrollsDocs.map(p => ({ ...p, _id: p.id }));
     res.render('admin/payroll', { title: 'Payroll', payrolls, userType, status, user: req.session.user });
   } catch (err) {
     console.error(err);
@@ -164,7 +165,8 @@ exports.getPayroll = async (req, res) => {
 
 // GET /admin/payroll/generate
 exports.getGeneratePayroll = async (req, res) => {
-  const users = await prisma.user.findMany({ where: { role: { not: 'admin' }, isActive: true } });
+  const usersDocs = await prisma.user.findMany({ where: { role: { not: 'admin' }, isActive: true } });
+  const users = usersDocs.map(u => ({ ...u, _id: u.id }));
   res.render('admin/payroll-generate', { title: 'Generate Payroll', users, user: req.session.user, error: req.flash('error') });
 };
 
@@ -219,6 +221,8 @@ exports.postGeneratePayroll = async (req, res) => {
       data: {
         userId: userDoc.userId,
         userName: userDoc.name,
+        userType: userDoc.role,
+        periodType: periodType,
         periodStart: startStr,
         periodEnd: endStr,
         totalHours: Math.round(totalHours * 100) / 100,

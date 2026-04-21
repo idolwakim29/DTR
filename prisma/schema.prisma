@@ -82,6 +82,8 @@ model Payroll {
   id             String    @id @default(uuid())
   userId         String
   userName       String
+  userType       String?
+  periodType     String?
   periodStart    String
   periodEnd      String
   totalHours     Float

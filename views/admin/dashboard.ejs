@@ -115,11 +115,11 @@
         <tbody>
           <% recentPayrolls.forEach(p => { %>
           <tr>
-            <td><strong><%= p.userName %></strong><br><small style="color:var(--gray-600)"><%= p.periodType %></small></td>
-            <td class="payroll-amount">₱<%= p.totalSalary.toFixed(2) %></td>
+            <td><strong><%= p.userName %></strong><br><small style="color:var(--gray-600)"><%= p.periodType || '—' %></small></td>
+            <td class="payroll-amount">₱<%= p.grossPay.toFixed(2) %></td>
             <td>
-              <span class="badge <%= p.paymentStatus === 'paid' ? 'badge-green' : 'badge-red' %>">
-                <%= p.paymentStatus === 'paid' ? 'Paid' : 'Unpaid' %>
+              <span class="badge <%= p.isPaid ? 'badge-green' : 'badge-red' %>">
+                <%= p.isPaid ? 'Paid' : 'Unpaid' %>
               </span>
             </td>
           </tr>

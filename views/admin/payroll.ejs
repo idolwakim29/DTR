@@ -50,40 +50,40 @@
               <small style="color:var(--gray-600)"><%= p.userId %></small>
             </td>
             <td>
-              <span class="badge <%= p.userType === 'student' ? 'badge-blue' : 'badge-orange' %>">
-                <%= p.userType.charAt(0).toUpperCase() + p.userType.slice(1) %>
+              <span class="badge <%= (p.userType || 'student') === 'student' ? 'badge-blue' : 'badge-orange' %>">
+                <%= (p.userType || 'student').charAt(0).toUpperCase() + (p.userType || 'student').slice(1) %>
               </span>
             </td>
             <td>
-              <span class="badge badge-gray"><%= p.periodType %></span><br>
+              <span class="badge badge-gray"><%= p.periodType || '—' %></span><br>
               <small style="color:var(--gray-600);font-size:11px">
-                <%= new Date(p.periodStart).toLocaleDateString('en-PH') %> – <%= new Date(p.periodEnd).toLocaleDateString('en-PH') %>
+                <%= p.periodStart %> – <%= p.periodEnd %>
               </small>
             </td>
-            <td>₱<%= p.hourlyRate.toFixed(2) %></td>
-            <td><strong><%= p.totalHoursWorked.toFixed(2) %> hrs</strong></td>
+            <td>₱<%= (p.baseRate || 0).toFixed(2) %></td>
+            <td><strong><%= p.totalHours.toFixed(2) %> hrs</strong></td>
             <td>
-              <% if (p.totalOvertimeHours > 0) { %>
-                <span class="badge badge-green">+<%= p.totalOvertimeHours.toFixed(2) %> OT</span>
-              <% } else if (p.totalUndertimeHours > 0) { %>
-                <span class="badge badge-red">−<%= p.totalUndertimeHours.toFixed(2) %> UT</span>
+              <% if (p.overtimeHours > 0) { %>
+                <span class="badge badge-green">+<%= p.overtimeHours.toFixed(2) %> OT</span>
+              <% } else if (p.undertimeHours > 0) { %>
+                <span class="badge badge-red">−<%= p.undertimeHours.toFixed(2) %> UT</span>
               <% } else { %>
                 <span style="color:var(--gray-400)">—</span>
               <% } %>
             </td>
-            <td class="payroll-amount">₱<%= p.totalSalary.toFixed(2) %></td>
+            <td class="payroll-amount">₱<%= p.grossPay.toFixed(2) %></td>
             <td>
-              <span class="badge <%= p.paymentStatus === 'paid' ? 'badge-green' : 'badge-red' %>">
-                <i class="fas <%= p.paymentStatus === 'paid' ? 'fa-check' : 'fa-clock' %>"></i>
-                <%= p.paymentStatus === 'paid' ? 'Paid' : 'Unpaid' %>
+              <span class="badge <%= p.isPaid ? 'badge-green' : 'badge-red' %>">
+                <i class="fas <%= p.isPaid ? 'fa-check' : 'fa-clock' %>"></i>
+                <%= p.isPaid ? 'Paid' : 'Unpaid' %>
               </span>
-              <% if (p.paidAt) { %>
-                <br><small style="color:var(--gray-600);font-size:11px"><%= new Date(p.paidAt).toLocaleDateString('en-PH') %></small>
+              <% if (p.paidOn) { %>
+                <br><small style="color:var(--gray-600);font-size:11px"><%= new Date(p.paidOn).toLocaleDateString('en-PH') %></small>
               <% } %>
             </td>
             <td>
               <div style="display:flex;gap:6px;flex-wrap:wrap">
-                <% if (p.paymentStatus !== 'paid') { %>
+                <% if (!p.isPaid) { %>
                 <form action="/admin/payroll/pay/<%= p._id %>" method="POST" onsubmit="return confirm('Mark this payroll as Paid?')">
                   <button class="btn btn-sm btn-success" title="Mark Paid"><i class="fas fa-check"></i></button>
                 </form>

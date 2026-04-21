@@ -338,8 +338,8 @@ exports.getMaintenanceDTR = async (req, res) => {
       if (dateFrom) query.date.gte = dateFrom;
       if (dateTo) query.date.lte = dateTo;
     }
-    const logs = await prisma.dTRLog.findMany({ where: query, orderBy: { date: 'desc' } });
-
+    const logsDocs = await prisma.dTRLog.findMany({ where: query, orderBy: { date: 'desc' } });
+    const logs = logsDocs.map(l => ({ ...l, _id: l.id }));
     res.render('admin/dtr-maintenance', { title: 'Maintenance DTR', logs, search, dateFrom, dateTo, user: req.session.user });
   } catch (err) {
     console.error(err);
@@ -359,8 +359,8 @@ exports.getStudentDTR = async (req, res) => {
       if (dateFrom) query.date.gte = dateFrom;
       if (dateTo) query.date.lte = dateTo;
     }
-    const logs = await prisma.dTRLog.findMany({ where: query, orderBy: { date: 'desc' } });
-
+    const logsDocs = await prisma.dTRLog.findMany({ where: query, orderBy: { date: 'desc' } });
+    const logs = logsDocs.map(l => ({ ...l, _id: l.id }));
     res.render('admin/dtr-students', { title: 'Student DTR', logs, search, dateFrom, dateTo, user: req.session.user });
   } catch (err) {
     console.error(err);
@@ -413,8 +413,9 @@ exports.getSummary = async (req, res) => {
 
 exports.getEditLog = async (req, res) => {
   try {
-    const log = await prisma.dTRLog.findUnique({ where: { id: req.params.id } });
-    if (!log) return res.redirect('back');
+    const logDoc = await prisma.dTRLog.findUnique({ where: { id: req.params.id } });
+    if (!logDoc) return res.redirect('back');
+    const log = { ...logDoc, _id: logDoc.id };
     res.render('admin/dtr-edit', { title: 'Edit Log', log, user: req.session.user });
   } catch (err) {
     res.redirect('back');
