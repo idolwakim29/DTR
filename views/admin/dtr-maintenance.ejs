@@ -54,7 +54,7 @@
             <% const lastOut = log.sessions && log.sessions.length > 0 ? log.sessions[log.sessions.length-1].timeOut : log.timeOut; %>
             <% if (log.status === 'completed' && lastOut) { %>
               <span class="badge badge-red"><%= new Date(lastOut).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}) %></span>
-            <% } else if (log.status === 'on-break') { %>
+            <% } else if (log.status === 'on_break') { %>
               <span class="badge badge-orange">On Break</span>
             <% } else { %><span style="color:var(--gray-400)">—</span><% } %>
           </td>
@@ -78,8 +78,8 @@
             <% } else { %><span style="color:var(--gray-400)">—</span><% } %>
           </td>
           <td>
-            <span class="badge <%= log.status === 'completed' ? 'badge-green' : log.status === 'on-break' ? 'badge-orange' : 'badge-blue' %>">
-              <%= log.status === 'completed' ? 'Done' : log.status === 'on-break' ? 'Break' : 'Active' %>
+            <span class="badge <%= log.status === 'completed' ? 'badge-green' : log.status === 'on_break' ? 'badge-orange' : 'badge-blue' %>">
+              <%= log.status === 'completed' ? 'Done' : log.status === 'on_break' ? 'Break' : 'Active' %>
             </span>
           </td>
           <td>

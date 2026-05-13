@@ -298,37 +298,40 @@ exports.exportPayrollExcel = async (req, res) => {
 
     let query = {};
     if (period && date) {
-      // Map 'day/week/month' to 'daily/weekly/monthly' for DB
+      // Normalize period aliases to DB values
       let dbPeriod = period;
-      if (period === 'day') dbPeriod = 'daily';
-      if (period === 'week') dbPeriod = 'weekly';
+      if (period === 'day')   dbPeriod = 'daily';
+      if (period === 'week')  dbPeriod = 'weekly';
       if (period === 'month') dbPeriod = 'monthly';
-      // Inverse map for moment logic
-      let momentPeriod = period;
-      if (period === 'daily') momentPeriod = 'day';
-      if (period === 'weekly') momentPeriod = 'week';
-      if (period === 'monthly') momentPeriod = 'month';
+
+      // Normalize to moment unit
+      let momentPeriod = dbPeriod;
+      if (dbPeriod === 'daily')   momentPeriod = 'day';
+      if (dbPeriod === 'weekly')  momentPeriod = 'week';
+      if (dbPeriod === 'monthly') momentPeriod = 'month';
 
       query.periodType = dbPeriod;
 
+      // Build date range as YYYY-MM-DD strings (matching how periodStart/periodEnd are stored)
       const targetDate = moment(date);
-      let start, end;
+      let startStr, endStr;
       if (momentPeriod === 'day') {
-        start = targetDate.startOf('day').toDate();
-        end = targetDate.endOf('day').toDate();
+        startStr = targetDate.format('YYYY-MM-DD');
+        endStr   = targetDate.format('YYYY-MM-DD');
       } else if (momentPeriod === 'week') {
-        start = targetDate.startOf('isoWeek').toDate();
-        end = targetDate.endOf('isoWeek').toDate();
+        startStr = moment(date).startOf('isoWeek').format('YYYY-MM-DD');
+        endStr   = moment(date).endOf('isoWeek').format('YYYY-MM-DD');
       } else if (momentPeriod === 'month') {
-        start = targetDate.startOf('month').toDate();
-        end = targetDate.endOf('month').toDate();
+        startStr = moment(date).startOf('month').format('YYYY-MM-DD');
+        endStr   = moment(date).endOf('month').format('YYYY-MM-DD');
       }
-      if (start && end) {
-        query.periodStart = { gte: startStr, lte: endStr }; // Assuming strings for stability as seen in generate
+      if (startStr && endStr) {
+        query.periodStart = { gte: startStr };
+        query.periodEnd   = { lte: endStr };
       }
     }
 
-    const payrolls = await prisma.payroll.findMany({ orderBy: [{ userName: 'asc' }] });
+    const payrolls = await prisma.payroll.findMany({ where: query, orderBy: [{ userName: 'asc' }] });
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Payroll');
@@ -384,9 +387,9 @@ exports.exportPayrollExcel = async (req, res) => {
     payrolls.forEach(p => {
       const row = worksheet.addRow([
         p.userName,
-        ''.toUpperCase(),
+        (p.userType || '').charAt(0).toUpperCase() + (p.userType || '').slice(1),
         p.totalHours.toFixed(2),
-        `₱${p.hourlyRate.toFixed(2)}`,
+        `₱${(p.baseRate || 0).toFixed(2)}`,
         `₱${p.grossPay.toFixed(2)}`,
         `₱${(p.deductions || 0).toFixed(2)}`,
         `₱${(p.netPay || p.grossPay).toFixed(2)}`,
