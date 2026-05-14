@@ -1,8 +1,9 @@
 const prisma = require('../prismaClient');
-const moment = require('moment');
+const moment = require('moment-timezone');
+const PH_TZ = 'Asia/Manila';
 
 function timeOfDay() {
-  const h = new Date().getHours();
+  const h = moment().tz(PH_TZ).hour(); // use PH local hour, not UTC
   if (h < 12) return 'morning';
   if (h < 18) return 'afternoon';
   return 'evening';
@@ -12,14 +13,23 @@ function handleAfternoonCutoff(nowDate) {
   const cutoffStr = process.env.AFTERNOON_CUTOFF || '13:30';
   const [cutoffH, cutoffM] = cutoffStr.split(':').map(Number);
 
-  const mNow = moment(nowDate);
-  const cutoffTime = moment(nowDate).hour(cutoffH).minute(cutoffM).second(0).millisecond(0);
+  // Morning restriction: block unrealistically early clock-ins (default: before 6:00 AM)
+  const morningStartHour = parseInt(process.env.MORNING_START_HOUR || '6', 10);
+  const mNow = moment.tz(nowDate, PH_TZ);  // interpret in PH time
+
+  if (mNow.hour() < morningStartHour) {
+    return { isClosed: true, lateAfternoon: false, effectiveTime: nowDate,
+             message: `Clock-in is not allowed before ${morningStartHour}:00 AM.` };
+  }
+
+  const cutoffTime = moment.tz(nowDate, PH_TZ).hour(cutoffH).minute(cutoffM).second(0).millisecond(0);
 
   if (mNow.hour() >= 12) {
     if (mNow.isAfter(cutoffTime)) {
       const minutesLate = mNow.diff(cutoffTime, 'minutes');
-      if (minutesLate > 60) {
-        return { isClosed: true, lateAfternoon: false, effectiveTime: nowDate };
+      if (minutesLate >= 60) {   // fixed: was > 60, now >= 60 so exactly 60 min late is also blocked
+        return { isClosed: true, lateAfternoon: false, effectiveTime: nowDate,
+                 message: 'Afternoon log-in window closed. Contact your administrator.' };
       }
       return { isClosed: false, lateAfternoon: true, effectiveTime: cutoffTime.toDate() };
     }
@@ -27,33 +37,64 @@ function handleAfternoonCutoff(nowDate) {
   return { isClosed: false, lateAfternoon: false, effectiveTime: nowDate };
 }
 
+function handleShiftEndCutoff(nowDate) {
+  const shiftEndStr = process.env.SHIFT_END || '17:00';
+  const [endH, endM] = shiftEndStr.split(':').map(Number);
+  const graceMinutes = parseInt(process.env.LATE_CLOCKOUT_WINDOW || '30', 10);
+
+  const mNow = moment.tz(nowDate, PH_TZ);  // interpret in PH time
+  const shiftEndTime = moment.tz(nowDate, PH_TZ).hour(endH).minute(endM).second(0).millisecond(0);
+
+  // Only applies when clocking out AFTER the official shift end
+  if (mNow.isAfter(shiftEndTime)) {
+    const minutesLate = mNow.diff(shiftEndTime, 'minutes');
+    if (minutesLate > graceMinutes) {
+      // Clocked out too late — cap timeOut to shift end so no false overtime
+      return {
+        effectiveTime: shiftEndTime.toDate(),
+        lateClockout: true,
+        capped: true,
+        message: `Your clock-out time was capped to ${shiftEndStr} (you were ${minutesLate} min past shift end).`
+      };
+    }
+    // Within grace window — keep actual time but flag it
+    return { effectiveTime: nowDate, lateClockout: true, capped: false, message: null };
+  }
+
+  return { effectiveTime: nowDate, lateClockout: false, capped: false, message: null };
+}
+
 const excludeLunchTime = (timeIn, timeOut) => {
-  const LUNCH_START = 12; // 12 PM
-  const LUNCH_END = 13;   // 1 PM
+  const LUNCH_START = 12; // 12 PM PH time
+  const LUNCH_END = 13;   // 1 PM PH time
 
   if (!timeIn || !timeOut) return 0;
 
-  let start = new Date(timeIn);
-  let end = new Date(timeOut);
+  const start = new Date(timeIn);
+  const end   = new Date(timeOut);
 
-  const startHour = start.getHours() + start.getMinutes() / 60;
-  const endHour = end.getHours() + end.getMinutes() / 60;
+  // IMPORTANT: use PH timezone hours — getHours() returns UTC on Vercel servers
+  const startHour = moment.tz(start, PH_TZ).hour() + moment.tz(start, PH_TZ).minute() / 60;
+  const endHour   = moment.tz(end,   PH_TZ).hour() + moment.tz(end,   PH_TZ).minute() / 60;
+
+  // Duration in hours (millisecond arithmetic is timezone-agnostic — always correct)
+  const rawHours = (end - start) / (1000 * 60 * 60);
 
   if (endHour <= LUNCH_START || startHour >= LUNCH_END) {
-    return (end - start) / (1000 * 60 * 60);
+    return rawHours;
   }
   if (startHour <= LUNCH_START && endHour >= LUNCH_END) {
-    return (end - start) / (1000 * 60 * 60) - 1;
+    return rawHours - 1;
   }
   if (startHour < LUNCH_START && endHour > LUNCH_START) {
     const lunchOverlap = Math.min(endHour, LUNCH_END) - LUNCH_START;
-    return (end - start) / (1000 * 60 * 60) - lunchOverlap;
+    return rawHours - lunchOverlap;
   }
   if (startHour < LUNCH_END && endHour > LUNCH_END) {
     const lunchOverlap = LUNCH_END - Math.max(startHour, LUNCH_START);
-    return (end - start) / (1000 * 60 * 60) - lunchOverlap;
+    return rawHours - lunchOverlap;
   }
-  return (end - start) / (1000 * 60 * 60);
+  return rawHours;
 };
 
 function calculateTotals(logData) {
@@ -106,7 +147,7 @@ exports.postKiosk = async (req, res) => {
       return res.json({ success: false, message: 'Incorrect password. Please try again.' });
     }
 
-    const today = moment().format('YYYY-MM-DD');
+    const today = moment().tz(PH_TZ).format('YYYY-MM-DD');
     let log = await prisma.dTRLog.findFirst({ where: { userId: user.userId, date: today } });
 
     if (action === 'time-in') {
@@ -114,7 +155,7 @@ exports.postKiosk = async (req, res) => {
       const cutoffInfo = handleAfternoonCutoff(now);
 
       if (cutoffInfo.isClosed) {
-        return res.json({ success: false, message: 'Afternoon log-in window closed. Contact your administrator.' });
+        return res.json({ success: false, message: cutoffInfo.message || 'Clock-in not allowed at this time. Contact your administrator.' });
       }
 
       if (log) {
@@ -136,9 +177,22 @@ exports.postKiosk = async (req, res) => {
         if (cutoffInfo.lateAfternoon) updateData.late_afternoon = true;
 
         log = await prisma.dTRLog.update({ where: { id: log.id }, data: updateData });
-        return res.json({ success: true, message: 'Welcome back! Afternoon session started.', userName: user.name, action: 'resume' });
+        const lateMinutes = cutoffInfo.lateAfternoon
+          ? Math.round(moment(now).diff(moment(cutoffInfo.effectiveTime), 'minutes'))
+          : 0;
+        return res.json({
+          success: true,
+          message: 'Welcome back! Afternoon session started.',
+          userName: user.name, userId: user.userId, userType: user.role,
+          action: 'resume',
+          isLateAfternoon: cutoffInfo.lateAfternoon,
+          lateAfternoonMinutes: lateMinutes
+        });
       }
 
+      const lateMinutes = cutoffInfo.lateAfternoon
+        ? Math.round(moment(now).diff(moment(cutoffInfo.effectiveTime), 'minutes'))
+        : 0;
       log = await prisma.dTRLog.create({
         data: {
           user_id: user.id, userId: user.userId, userName: user.name,
@@ -147,7 +201,14 @@ exports.postKiosk = async (req, res) => {
           isActive: true, requiredHours: user.requiredHours || 8, status: 'in_progress'
         }
       });
-      return res.json({ success: true, message: `Good ${timeOfDay()}! Time In recorded.`, userName: user.name, action: 'time-in' });
+      return res.json({
+        success: true,
+        message: `Good ${timeOfDay()}! Time In recorded.`,
+        userName: user.name, userId: user.userId, userType: user.role,
+        action: 'time-in',
+        isLateAfternoon: cutoffInfo.lateAfternoon,
+        lateAfternoonMinutes: lateMinutes
+      });
     }
 
     if (action === 'time-out') {
@@ -156,19 +217,22 @@ exports.postKiosk = async (req, res) => {
       if (!log.isActive) return res.json({ success: false, message: 'You are on break. Clock back in first.' });
 
       const now = new Date();
+      const shiftInfo = handleShiftEndCutoff(now);
+      const effectiveOut = shiftInfo.effectiveTime;
+
       let sessions = log.sessions || [];
       if (sessions.length === 0) {
-        log.timeOut = now;
+        log.timeOut = effectiveOut;
       } else {
         const last = sessions[sessions.length - 1];
-        if (!last.timeOut) last.timeOut = now;
+        if (!last.timeOut) last.timeOut = effectiveOut;
         log.sessions = sessions;
       }
 
       log.isActive = false;
       log.status = 'completed';
 
-      // calculate
+      // calculate totals (uses capped timeOut if applicable)
       const calcs = calculateTotals(log);
 
       log = await prisma.dTRLog.update({
@@ -178,13 +242,17 @@ exports.postKiosk = async (req, res) => {
           sessions: calcs.sessions,
           isActive: false,
           status: 'completed',
+          late_clockout: shiftInfo.lateClockout,
           totalHours: calcs.totalHours,
           overtimeHours: calcs.overtimeHours,
           undertimeHours: calcs.undertimeHours
         }
       });
 
-      return res.json({ success: true, message: `Time Out recorded! Total: ${log.totalHours} hrs`, action: 'time-out' });
+      const outMsg = shiftInfo.capped
+        ? `Time Out recorded (capped to shift end). Total: ${calcs.totalHours} hrs`
+        : `Time Out recorded! Total: ${calcs.totalHours} hrs`;
+      return res.json({ success: true, message: outMsg, action: 'time-out', lateClockout: shiftInfo.lateClockout, capped: shiftInfo.capped });
     }
 
     if (action === 'undo-timeout') {
@@ -195,8 +263,12 @@ exports.postKiosk = async (req, res) => {
       const minutesAgo = (Date.now() - new Date(lastOut)) / 60000;
       if (minutesAgo > 5) return res.json({ success: false, message: 'Undo window expired (5 minutes). Contact an admin.' });
 
-      if (sessions.length > 0) { sessions[sessions.length - 1].timeOut = null; }
-      else { log.timeOut = null; }
+      if (sessions.length > 0) {
+        sessions[sessions.length - 1].timeOut = null;
+        log.timeOut = null; // also clear root timeOut to prevent stale double-count in calculateTotals
+      } else {
+        log.timeOut = null;
+      }
       log.sessions = sessions;
       log.isActive = true;
       log.status = 'in_progress';
@@ -224,7 +296,7 @@ exports.postKiosk = async (req, res) => {
 
 exports.getRecentLogs = async (req, res) => {
   try {
-    const today = moment().format('YYYY-MM-DD');
+    const today = moment().tz(PH_TZ).format('YYYY-MM-DD');
     const logs = await prisma.dTRLog.findMany({
       where: { date: today },
       orderBy: { createdAt: 'desc' },
@@ -242,21 +314,33 @@ exports.getRecentLogs = async (req, res) => {
 };
 
 exports.getDTRPage = async (req, res) => {
-  const { userId } = req.session.user;
-  const today = moment().format('YYYY-MM-DD');
-  const todayLog = await prisma.dTRLog.findFirst({ where: { userId, date: today } });
-  res.render('dtr/index', { title: 'Time Record', user: req.session.user, todayLog, today });
+  try {
+    const { userId } = req.session.user;
+    const today = moment().tz(PH_TZ).format('YYYY-MM-DD');
+    const todayLog = await prisma.dTRLog.findFirst({ where: { userId, date: today } });
+    res.render('dtr/index', { title: 'Time Record', user: req.session.user, todayLog, today });
+  } catch (err) {
+    console.error('getDTRPage error:', err);
+    req.flash('error', 'Unable to load your time record. Please try again.');
+    res.redirect('/login');
+  }
 };
 
 exports.timeIn = async (req, res) => {
   const { userId, name, role } = req.session.user;
-  const today = moment().format('YYYY-MM-DD');
+  const today = moment().tz(PH_TZ).format('YYYY-MM-DD');
   try {
     const userDoc = await prisma.user.findUnique({ where: { userId } });
     let existing = await prisma.dTRLog.findFirst({ where: { userId, date: today } });
 
     const now = new Date();
     const cutoffInfo = handleAfternoonCutoff(now);
+
+    // Block clock-in outside allowed hours (too early in morning OR past afternoon cutoff)
+    if (cutoffInfo.isClosed) {
+      req.flash('error', cutoffInfo.message || 'Clock-in not allowed at this time. Contact your administrator.');
+      return res.redirect('/dtr');
+    }
 
     if (existing) {
       if (existing.status === 'completed') { req.flash('error', 'Shift already completed today.'); return res.redirect('/dtr'); }
@@ -290,7 +374,7 @@ exports.timeIn = async (req, res) => {
 
 exports.timeOut = async (req, res) => {
   const { userId } = req.session.user;
-  const today = moment().format('YYYY-MM-DD');
+  const today = moment().tz(PH_TZ).format('YYYY-MM-DD');
   try {
     let log = await prisma.dTRLog.findFirst({ where: { userId, date: today } });
     if (!log) { req.flash('error', 'No Time In found for today.'); return res.redirect('/dtr'); }
@@ -298,9 +382,16 @@ exports.timeOut = async (req, res) => {
     if (!log.isActive) { req.flash('error', 'You are on break. Time In first.'); return res.redirect('/dtr'); }
 
     const now = new Date();
+    const shiftInfo = handleShiftEndCutoff(now);
+    const effectiveOut = shiftInfo.effectiveTime;
+
     let sessions = log.sessions || [];
-    if (sessions.length === 0) { log.timeOut = now; }
-    else { const last = sessions[sessions.length - 1]; if (!last.timeOut) last.timeOut = now; log.sessions = sessions; }
+    if (sessions.length === 0) { log.timeOut = effectiveOut; }
+    else {
+      const last = sessions[sessions.length - 1];
+      if (!last.timeOut) last.timeOut = effectiveOut;
+      log.sessions = sessions;
+    }
 
     const calcs = calculateTotals(log);
 
@@ -311,13 +402,18 @@ exports.timeOut = async (req, res) => {
         sessions: calcs.sessions,
         isActive: false,
         status: 'completed',
+        late_clockout: shiftInfo.lateClockout,
         totalHours: calcs.totalHours,
         overtimeHours: calcs.overtimeHours,
         undertimeHours: calcs.undertimeHours
       }
     });
 
-    req.flash('success', `Time Out recorded! Total: ${calcs.totalHours} hrs`);
+    if (shiftInfo.capped) {
+      req.flash('warning', `Clock-out was past shift end — time capped to ${process.env.SHIFT_END || '17:00'}. Total: ${calcs.totalHours} hrs`);
+    } else {
+      req.flash('success', `Time Out recorded! Total: ${calcs.totalHours} hrs`);
+    }
     res.redirect('/dtr');
   } catch (err) {
     console.error(err);
@@ -371,8 +467,8 @@ exports.getStudentDTR = async (req, res) => {
 exports.getSummary = async (req, res) => {
   try {
     const { userType = 'student', dateFrom, dateTo, userId } = req.query;
-    const from = dateFrom || moment().startOf('month').format('YYYY-MM-DD');
-    const to = dateTo || moment().format('YYYY-MM-DD');
+    const from = dateFrom || moment().tz(PH_TZ).startOf('month').format('YYYY-MM-DD');
+    const to = dateTo || moment().tz(PH_TZ).format('YYYY-MM-DD');
 
     let query = { userType, date: { gte: from, lte: to } };
     if (userId) query.userId = userId;
@@ -384,7 +480,7 @@ exports.getSummary = async (req, res) => {
         byEmployee[log.userId] = {
           userId: log.userId, userName: log.userName,
           days: 0, totalHours: 0, overtimeHours: 0, undertimeHours: 0,
-          completedDays: 0, incompleteDays: 0, lateAfternoonCount: 0
+          completedDays: 0, incompleteDays: 0, lateAfternoonCount: 0, lateClockoutCount: 0
         };
       }
       const e = byEmployee[log.userId];
@@ -395,6 +491,7 @@ exports.getSummary = async (req, res) => {
       if (log.status === 'completed') e.completedDays++;
       else e.incompleteDays++;
       if (log.late_afternoon) e.lateAfternoonCount++;
+      if (log.late_clockout) e.lateClockoutCount++;
     });
     const summaries = Object.values(byEmployee).map(e => ({
       ...e,
@@ -424,13 +521,14 @@ exports.getEditLog = async (req, res) => {
 
 exports.postEditLog = async (req, res) => {
   try {
-    const { timeIn, timeOut, notes, requiredHours, late_afternoon } = req.body;
+    const { timeIn, timeOut, notes, requiredHours, late_afternoon, late_clockout } = req.body;
     let log = await prisma.dTRLog.findUnique({ where: { id: req.params.id } });
 
     if (timeIn) log.timeIn = new Date(timeIn);
     if (timeOut) { log.timeOut = new Date(timeOut); log.isActive = false; log.status = 'completed'; }
     if (requiredHours) log.requiredHours = parseFloat(requiredHours);
     log.late_afternoon = late_afternoon === 'on';
+    log.late_clockout  = late_clockout  === 'on';
     log.notes = notes;
 
     const calcs = calculateTotals(log);
@@ -444,6 +542,7 @@ exports.postEditLog = async (req, res) => {
         status: log.status,
         requiredHours: log.requiredHours,
         late_afternoon: log.late_afternoon,
+        late_clockout: log.late_clockout,
         notes: log.notes,
         totalHours: calcs.totalHours,
         overtimeHours: calcs.overtimeHours,
@@ -472,8 +571,8 @@ exports.deleteLog = async (req, res) => {
 exports.getAbsenceSummary = async (req, res) => {
   try {
     const { type = 'all', from, to } = req.query;
-    const dateFrom = from || moment().startOf('month').format('YYYY-MM-DD');
-    const dateTo = to || moment().format('YYYY-MM-DD');
+    const dateFrom = from || moment().tz(PH_TZ).startOf('month').format('YYYY-MM-DD');
+    const dateTo = to || moment().tz(PH_TZ).format('YYYY-MM-DD');
 
     let userQuery = { role: { not: 'admin' }, isActive: true };
     if (type !== 'all') { userQuery.role = type; }

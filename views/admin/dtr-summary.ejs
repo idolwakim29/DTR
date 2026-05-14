@@ -61,7 +61,10 @@
           <td>
             <strong><%= s.days %></strong>
             <% if (s.lateAfternoonCount > 0) { %>
-              <br><span class="badge badge-orange" style="margin-top:4px;"><i class="fas fa-clock"></i> <%= s.lateAfternoonCount %> Late PM</span>
+              <br><span class="badge badge-orange" style="margin-top:4px;"><i class="fas fa-exclamation-triangle"></i> <%= s.lateAfternoonCount %> Late PM</span>
+            <% } %>
+            <% if (s.lateClockoutCount > 0) { %>
+              <br><span class="badge badge-orange" style="margin-top:4px;"><i class="fas fa-clock"></i> <%= s.lateClockoutCount %> Late Out</span>
             <% } %>
           </td>
           <td><span class="badge badge-green"><%= s.completedDays %></span></td>

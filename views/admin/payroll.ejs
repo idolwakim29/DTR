@@ -3,13 +3,17 @@
 <div class="card">
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-money-bill-wave" style="color:var(--red);margin-right:8px"></i>Payroll Records</h3>
-    <div>
+    <div style="display:flex;gap:8px;">
       <a href="/admin/payroll/generate" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Generate Payroll</a>
-      <button onclick="promptExport()" class="btn btn-success btn-sm" style="margin-left: 8px;"><i class="fas fa-file-excel"></i> Export to Excel</button>
+      <button onclick="openExportModal()" class="btn btn-success btn-sm" id="exportBtn">
+        <i class="fas fa-file-excel"></i> Export to Excel
+      </button>
     </div>
   </div>
   <div class="card-body">
     <form method="GET" class="filter-bar">
+      <input type="text" name="search" class="form-control" placeholder="Search name or ID..."
+        value="<%= search || '' %>" style="width:200px;">
       <select name="userType" class="form-select" style="width:180px">
         <option value="">All Types</option>
         <option value="maintenance" <%= userType === 'maintenance' ? 'selected' : '' %>>Maintenance</option>
@@ -18,7 +22,7 @@
       <select name="status" class="form-select" style="width:180px">
         <option value="">All Status</option>
         <option value="unpaid" <%= status === 'unpaid' ? 'selected' : '' %>>Unpaid</option>
-        <option value="paid" <%= status === 'paid' ? 'selected' : '' %>>Paid</option>
+        <option value="paid"   <%= status === 'paid'   ? 'selected' : '' %>>Paid</option>
       </select>
       <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
       <a href="/admin/payroll" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
@@ -37,7 +41,9 @@
             <th>Rate/hr</th>
             <th>Hours</th>
             <th>OT / UT</th>
-            <th>Total Salary</th>
+            <th>Gross Pay</th>
+            <th>Deductions</th>
+            <th>Net Pay</th>
             <th>Status</th>
             <th>Actions</th>
           </tr>
@@ -56,9 +62,7 @@
             </td>
             <td>
               <span class="badge badge-gray"><%= p.periodType || '—' %></span><br>
-              <small style="color:var(--gray-600);font-size:11px">
-                <%= p.periodStart %> – <%= p.periodEnd %>
-              </small>
+              <small style="color:var(--gray-600);font-size:11px"><%= p.periodStart %> – <%= p.periodEnd %></small>
             </td>
             <td>₱<%= (p.baseRate || 0).toFixed(2) %></td>
             <td><strong><%= p.totalHours.toFixed(2) %> hrs</strong></td>
@@ -73,6 +77,16 @@
             </td>
             <td class="payroll-amount">₱<%= p.grossPay.toFixed(2) %></td>
             <td>
+              <% if ((p.deductions || 0) > 0) { %>
+                <span style="color:var(--danger);font-weight:600">−₱<%= p.deductions.toFixed(2) %></span>
+              <% } else { %>
+                <span style="color:var(--gray-400)">—</span>
+              <% } %>
+            </td>
+            <td>
+              <strong style="color:var(--success)">₱<%= (p.netPay || p.grossPay).toFixed(2) %></strong>
+            </td>
+            <td>
               <span class="badge <%= p.isPaid ? 'badge-green' : 'badge-red' %>">
                 <i class="fas <%= p.isPaid ? 'fa-check' : 'fa-clock' %>"></i>
                 <%= p.isPaid ? 'Paid' : 'Unpaid' %>
@@ -84,12 +98,18 @@
             <td>
               <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <% if (!p.isPaid) { %>
-                <form action="/admin/payroll/pay/<%= p._id %>" method="POST" onsubmit="return confirm('Mark this payroll as Paid?')">
-                  <button class="btn btn-sm btn-success" title="Mark Paid"><i class="fas fa-check"></i></button>
+                <form action="/admin/payroll/pay/<%= p._id %>" method="POST"
+                      onsubmit="return confirmPay(event, '<%= p.userName %>', '<%= (p.netPay || p.grossPay).toFixed(2) %>')">
+                  <button class="btn btn-sm btn-success" title="Mark Paid" id="payBtn-<%= p._id %>">
+                    <i class="fas fa-check"></i>
+                  </button>
                 </form>
                 <% } %>
-                <form action="/admin/payroll/delete/<%= p._id %>" method="POST" onsubmit="return confirm('Delete this record?')">
-                  <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                <form action="/admin/payroll/delete/<%= p._id %>" method="POST"
+                      onsubmit="return confirmDelete(event, '<%= p.userName %>')">
+                  <button class="btn btn-sm btn-danger" title="Delete" id="delBtn-<%= p._id %>">
+                    <i class="fas fa-trash"></i>
+                  </button>
                 </form>
               </div>
             </td>
@@ -102,15 +122,148 @@
   </div>
 </div>
 
+<!-- ── Export Modal ── -->
+<div id="exportModal" style="display:none;position:fixed;z-index:999;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;" onclick="closeExportModal(event)">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:420px;max-width:94%;box-shadow:0 20px 60px rgba(0,0,0,.25);" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <h3 style="margin:0;font-size:17px;font-weight:800;"><i class="fas fa-file-excel" style="color:#22c55e;margin-right:8px;"></i>Export Payroll to Excel</h3>
+      <button onclick="closeExportModal()" style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:20px;">&times;</button>
+    </div>
+
+    <div class="form-group" style="margin-bottom:14px;">
+      <label class="form-label">Period Type</label>
+      <select id="exportPeriod" class="form-select" style="width:100%;" onchange="updateExportDate()">
+        <option value="month">Monthly</option>
+        <option value="week">Weekly</option>
+        <option value="day">Daily</option>
+      </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom:20px;">
+      <label class="form-label" id="exportDateLabel">Target Month</label>
+      <input type="date" id="exportDate" class="form-control" style="width:100%;">
+    </div>
+
+    <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:9px;padding:12px 14px;font-size:12.5px;color:var(--gray-600);margin-bottom:20px;">
+      <i class="fas fa-info-circle" style="margin-right:6px;"></i>
+      Exports all payroll records matching the selected period. Download will start automatically.
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeExportModal()" class="btn btn-secondary">Cancel</button>
+      <button onclick="runExport()" class="btn btn-success" id="exportRunBtn">
+        <i class="fas fa-download"></i> Download Excel
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Confirm Modal ── -->
+<div id="confirmModal" style="display:none;position:fixed;z-index:1000;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:380px;max-width:94%;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="text-align:center;margin-bottom:16px;">
+      <div id="confirmIcon" style="font-size:36px;margin-bottom:8px;"></div>
+      <div id="confirmTitle" style="font-size:16px;font-weight:800;"></div>
+      <div id="confirmMsg" style="font-size:13px;color:var(--gray-600);margin-top:6px;"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <button onclick="cancelConfirm()" class="btn btn-secondary">Cancel</button>
+      <button id="confirmOkBtn" class="btn btn-primary">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script>
-function promptExport() {
-  const period = prompt("Enter export period (day, week, month):", "month");
-  if (!period) return;
-  const date = prompt("Enter target date (YYYY-MM-DD):", new Date().toISOString().slice(0,10));
-  if (!date) return;
-  
-  window.location.href = `/admin/payroll/export?period=${period.toLowerCase()}&date=${date}`;
+/* ── Export Modal ── */
+let exportModalEl = document.getElementById('exportModal');
+
+function openExportModal() {
+  // Set default date to today
+  document.getElementById('exportDate').value = new Date().toISOString().slice(0, 10);
+  exportModalEl.style.display = 'flex';
 }
+function closeExportModal(e) {
+  if (!e || e.target === exportModalEl) exportModalEl.style.display = 'none';
+}
+function updateExportDate() {
+  const period = document.getElementById('exportPeriod').value;
+  const labels = { month: 'Target Month', week: 'Any Date in the Week', day: 'Specific Date' };
+  document.getElementById('exportDateLabel').textContent = labels[period] || 'Date';
+}
+
+function runExport() {
+  const period = document.getElementById('exportPeriod').value;
+  const date   = document.getElementById('exportDate').value;
+  if (!date) { alert('Please select a date.'); return; }
+
+  const btn = document.getElementById('exportRunBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+
+  // Trigger download
+  window.location.href = `/admin/payroll/export?period=${period}&date=${date}`;
+
+  // Re-enable after a moment (download is a navigation, not async)
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-download"></i> Download Excel';
+    exportModalEl.style.display = 'none';
+  }, 3000);
+}
+
+/* ── Confirm Modal ── */
+let _pendingForm = null;
+let _confirmOk   = document.getElementById('confirmOkBtn');
+
+function confirmPay(e, name, amount) {
+  e.preventDefault();
+  _pendingForm = e.target;
+  document.getElementById('confirmIcon').innerHTML = '<i class="fas fa-check-circle" style="color:var(--success)"></i>';
+  document.getElementById('confirmTitle').textContent = 'Mark as Paid?';
+  document.getElementById('confirmMsg').innerHTML =
+    `Are you sure you want to mark <strong>${name}</strong>'s payroll as paid?<br>
+     <span style="font-size:15px;font-weight:800;color:var(--success);margin-top:8px;display:block;">Net Pay: ₱${amount}</span>`;
+  _confirmOk.textContent = 'Mark Paid';
+  _confirmOk.className = 'btn btn-success';
+  _confirmOk.onclick = doConfirm;
+  document.getElementById('confirmModal').style.display = 'flex';
+  return false;
+}
+
+function confirmDelete(e, name) {
+  e.preventDefault();
+  _pendingForm = e.target;
+  document.getElementById('confirmIcon').innerHTML = '<i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i>';
+  document.getElementById('confirmTitle').textContent = 'Delete Record?';
+  document.getElementById('confirmMsg').innerHTML = `Delete <strong>${name}</strong>'s payroll record? This cannot be undone.`;
+  _confirmOk.textContent = 'Delete';
+  _confirmOk.className = 'btn btn-danger';
+  _confirmOk.onclick = doConfirm;
+  document.getElementById('confirmModal').style.display = 'flex';
+  return false;
+}
+
+function doConfirm() {
+  if (!_pendingForm) return;
+  // Show spinner on the submit button
+  const btn = _pendingForm.querySelector('button[type=submit], button:not([type])');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+  document.getElementById('confirmModal').style.display = 'none';
+  _pendingForm.submit();
+  _pendingForm = null;
+}
+
+function cancelConfirm() {
+  document.getElementById('confirmModal').style.display = 'none';
+  _pendingForm = null;
+}
+
+/* ── Loading state on Generate form ── */
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('form[action*="/pay/"], form[action*="/delete/"]').forEach(f => {
+    // handled by custom confirm above
+  });
+});
 </script>
 
 <%- include('../partials/admin-footer') %>

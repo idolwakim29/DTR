@@ -1,6 +1,7 @@
 const prisma = require('../prismaClient');
 const bcrypt = require('bcryptjs');
-const moment = require('moment');
+const moment = require('moment-timezone');
+const PH_TZ = 'Asia/Manila';
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
@@ -8,7 +9,7 @@ const path = require('path');
 // GET /admin/dashboard
 exports.getDashboard = async (req, res) => {
   try {
-    const today = moment().format('YYYY-MM-DD');
+    const today = moment().tz(PH_TZ).format('YYYY-MM-DD');
     const [totalMaintenance, totalStudents, totalLogs, totalPayrolls, todayLogs, todayLogsCount] = await Promise.all([
       prisma.user.count({ where: { role: 'maintenance', isActive: true } }),
       prisma.user.count({ where: { role: 'student', isActive: true } }),
@@ -39,7 +40,15 @@ exports.getDashboard = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.render('admin/dashboard', { title: 'Dashboard', stats: {}, todayLogs: [], recentPayrolls: [], user: req.session.user });
+    res.render('admin/dashboard', {
+      title: 'Dashboard',
+      stats: { totalMaintenance: 0, totalStudents: 0, totalLogs: 0, totalPayrolls: 0 },
+      extraStats: { totalAbsentToday: 0, advances: { count: 0, totalAmount: 0 } },
+      todayLogs: [],
+      recentPayrolls: [],
+      today: moment().tz(PH_TZ).format('YYYY-MM-DD'),
+      user: req.session.user
+    });
   }
 };
 
@@ -66,7 +75,7 @@ exports.getUsers = async (req, res) => {
 
 // GET /admin/users/new
 exports.getNewUser = (req, res) => {
-  res.render('admin/user-form', { title: 'Add User', editUser: null, user: req.session.user, error: req.flash('error') });
+  res.render('admin/user-form', { title: 'Add User', editUser: null, user: req.session.user });
 };
 
 // POST /admin/users/new
@@ -97,7 +106,7 @@ exports.getEditUser = async (req, res) => {
     const userDoc = await prisma.user.findUnique({ where: { id: req.params.id } });
     if (!userDoc) return res.redirect('/admin/users');
     const editUser = { ...userDoc, _id: userDoc.id };
-    res.render('admin/user-form', { title: 'Edit User', editUser, user: req.session.user, error: req.flash('error') });
+    res.render('admin/user-form', { title: 'Edit User', editUser, user: req.session.user });
   } catch (err) {
     res.redirect('/admin/users');
   }
@@ -142,6 +151,8 @@ exports.deleteUser = async (req, res) => {
     req.flash('success', 'User deleted.');
     res.redirect('/admin/users');
   } catch (err) {
+    console.error('deleteUser error:', err);
+    req.flash('error', 'Could not delete user. They may have linked records.');
     res.redirect('/admin/users');
   }
 };
@@ -149,14 +160,20 @@ exports.deleteUser = async (req, res) => {
 // GET /admin/payroll
 exports.getPayroll = async (req, res) => {
   try {
-    const { userType, status } = req.query;
+    const { userType, status, search } = req.query;
 
     let query = {};
     if (userType) query.userType = userType;
-    if (status) query.isPaid = status === 'paid';
+    if (status)   query.isPaid = status === 'paid';
+    if (search) {
+      query.OR = [
+        { userName: { contains: search, mode: 'insensitive' } },
+        { userId:   { contains: search, mode: 'insensitive' } }
+      ];
+    }
     const payrollsDocs = await prisma.payroll.findMany({ where: query, orderBy: { createdAt: 'desc' } });
     const payrolls = payrollsDocs.map(p => ({ ...p, _id: p.id }));
-    res.render('admin/payroll', { title: 'Payroll', payrolls, userType, status, user: req.session.user });
+    res.render('admin/payroll', { title: 'Payroll', payrolls, userType, status, search: search || '', user: req.session.user });
   } catch (err) {
     console.error(err);
     res.redirect('/admin/dashboard');
@@ -165,9 +182,15 @@ exports.getPayroll = async (req, res) => {
 
 // GET /admin/payroll/generate
 exports.getGeneratePayroll = async (req, res) => {
-  const usersDocs = await prisma.user.findMany({ where: { role: { not: 'admin' }, isActive: true } });
-  const users = usersDocs.map(u => ({ ...u, _id: u.id }));
-  res.render('admin/payroll-generate', { title: 'Generate Payroll', users, user: req.session.user, error: req.flash('error') });
+  try {
+    const usersDocs = await prisma.user.findMany({ where: { role: { not: 'admin' }, isActive: true } });
+    const users = usersDocs.map(u => ({ ...u, _id: u.id }));
+    res.render('admin/payroll-generate', { title: 'Generate Payroll', users, user: req.session.user });
+  } catch (err) {
+    console.error(err);
+    req.flash('error', 'Failed to load payroll generation page.');
+    res.redirect('/admin/payroll');
+  }
 };
 
 // POST /admin/payroll/generate
@@ -180,8 +203,22 @@ exports.postGeneratePayroll = async (req, res) => {
       return res.redirect('/admin/payroll/generate');
     }
 
-    const startStr = moment(periodStart).format('YYYY-MM-DD');
-    const endStr = moment(periodEnd).format('YYYY-MM-DD');
+    const startStr = moment.tz(periodStart, PH_TZ).format('YYYY-MM-DD');
+    const endStr   = moment.tz(periodEnd,   PH_TZ).format('YYYY-MM-DD');
+
+    // Prevent identical overlapping payroll generation
+    const existingPayroll = await prisma.payroll.findFirst({
+      where: {
+        userId: userDoc.userId,
+        periodStart: startStr,
+        periodEnd: endStr
+      }
+    });
+
+    if (existingPayroll) {
+      req.flash('error', `A payroll record already exists for ${userDoc.name} spanning ${startStr} to ${endStr}.`);
+      return res.redirect('/admin/payroll/generate');
+    }
 
     const logs = await prisma.dTRLog.findMany({
       where: {
@@ -202,7 +239,7 @@ exports.postGeneratePayroll = async (req, res) => {
       where: {
         userId: userDoc.userId,
         date: { gte: startStr, lte: endStr },
-        status: { in: ['in_progress', 'on_break'] }
+        status: 'in_progress'
       }
     });
 
@@ -234,8 +271,8 @@ exports.postGeneratePayroll = async (req, res) => {
         baseRate: userDoc.hourlyRate
       }
     });
-    // Mark advances as deducted locally? The original code didn't mark them instantly, it just included them. Wait, CashAdvances need to be marked deducted when payroll is paid!
-
+    // Note: cash advances are marked 'deducted' in markPaid(), not here,
+    // so the admin has a chance to review before committing payment.
 
     const warnMsg = incompleteLogs > 0
       ? ` (Note: ${incompleteLogs} incomplete log(s) were excluded.)`
@@ -264,11 +301,15 @@ exports.markPaid = async (req, res) => {
     });
 
 
-    // Mark associated advances as deducted
+    // Mark only advances within this payroll period as deducted
     const user = await prisma.user.findUnique({ where: { userId: payroll.userId } });
     if (user) {
       await prisma.cashAdvance.updateMany({
-        where: { employeeId: user.id, status: 'pending' },
+        where: {
+          employeeId: user.id,
+          status: 'pending',
+          targetPayrollDate: { gte: payroll.periodStart, lte: payroll.periodEnd }
+        },
         data: { status: 'deducted', deductedOn: new Date() }
       });
     }
@@ -283,10 +324,32 @@ exports.markPaid = async (req, res) => {
 // POST /admin/payroll/delete/:id
 exports.deletePayroll = async (req, res) => {
   try {
+    const payroll = await prisma.payroll.findUnique({ where: { id: req.params.id } });
+    if (!payroll) {
+      req.flash('error', 'Payroll record not found.');
+      return res.redirect('/admin/payroll');
+    }
+
+    // Revert associated cash advances if this payroll was already marked paid
+    if (payroll.isPaid) {
+      const user = await prisma.user.findUnique({ where: { userId: payroll.userId } });
+      if (user) {
+        await prisma.cashAdvance.updateMany({
+          where: {
+            employeeId: user.id,
+            status: 'deducted',
+            targetPayrollDate: { gte: payroll.periodStart, lte: payroll.periodEnd }
+          },
+          data: { status: 'pending', deductedOn: null }
+        });
+      }
+    }
+
     await prisma.payroll.delete({ where: { id: req.params.id } });
-    req.flash('success', 'Payroll record deleted.');
+    req.flash('success', 'Payroll record deleted successfully.');
     res.redirect('/admin/payroll');
   } catch (err) {
+    req.flash('error', 'Error deleting payroll record.');
     res.redirect('/admin/payroll');
   }
 };
@@ -297,6 +360,8 @@ exports.exportPayrollExcel = async (req, res) => {
     const { period, date } = req.query; // period=day|week|month, date=YYYY-MM-DD
 
     let query = {};
+    let startStr, endStr;
+
     if (period && date) {
       // Normalize period aliases to DB values
       let dbPeriod = period;
@@ -304,24 +369,17 @@ exports.exportPayrollExcel = async (req, res) => {
       if (period === 'week')  dbPeriod = 'weekly';
       if (period === 'month') dbPeriod = 'monthly';
 
-      // Normalize to moment unit
-      let momentPeriod = dbPeriod;
-      if (dbPeriod === 'daily')   momentPeriod = 'day';
-      if (dbPeriod === 'weekly')  momentPeriod = 'week';
-      if (dbPeriod === 'monthly') momentPeriod = 'month';
-
       query.periodType = dbPeriod;
 
-      // Build date range as YYYY-MM-DD strings (matching how periodStart/periodEnd are stored)
+      // Build date range as YYYY-MM-DD strings
       const targetDate = moment(date);
-      let startStr, endStr;
-      if (momentPeriod === 'day') {
+      if (dbPeriod === 'daily') {
         startStr = targetDate.format('YYYY-MM-DD');
         endStr   = targetDate.format('YYYY-MM-DD');
-      } else if (momentPeriod === 'week') {
+      } else if (dbPeriod === 'weekly') {
         startStr = moment(date).startOf('isoWeek').format('YYYY-MM-DD');
         endStr   = moment(date).endOf('isoWeek').format('YYYY-MM-DD');
-      } else if (momentPeriod === 'month') {
+      } else if (dbPeriod === 'monthly') {
         startStr = moment(date).startOf('month').format('YYYY-MM-DD');
         endStr   = moment(date).endOf('month').format('YYYY-MM-DD');
       }
@@ -333,87 +391,222 @@ exports.exportPayrollExcel = async (req, res) => {
 
     const payrolls = await prisma.payroll.findMany({ where: query, orderBy: [{ userName: 'asc' }] });
 
+    // Fetch all users to get department & requiredHours
+    const users = await prisma.user.findMany({ where: { role: { not: 'admin' } } });
+    const userMap = {};
+    users.forEach(u => { userMap[u.userId] = u; });
+
+    // For each payroll, count DTR logs (days worked) in the period
+    const daysWorkedMap = {};
+    await Promise.all(payrolls.map(async (p) => {
+      const s = p.periodStart;
+      const e = p.periodEnd;
+      const count = await prisma.dTRLog.count({
+        where: { userId: p.userId, date: { gte: s, lte: e }, status: 'completed' }
+      });
+      daysWorkedMap[p.id] = count;
+    }));
+
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Payroll');
 
-    // Add Logo (Optional: requires path to exist or handle graceful skipping)
-    let logoId;
+    // Column widths — 11 columns
+    worksheet.columns = [
+      { width: 28 }, // Name
+      { width: 20 }, // Area/Dept
+      { width: 14 }, // Daily Rate
+      { width: 14 }, // Hourly Rate
+      { width: 14 }, // Days Worked
+      { width: 14 }, // Hours Worked
+      { width: 16 }, // Gross Pay
+      { width: 14 }, // SSS
+      { width: 14 }, // PhilHealth
+      { width: 16 }, // Net Pay
+      { width: 30 }, // Signature
+    ];
+
+    // ── Logo ──
     const logoPath = path.join(__dirname, '../public/images/logo.png');
     if (fs.existsSync(logoPath)) {
-      logoId = workbook.addImage({
-        filename: logoPath,
-        extension: 'png',
-      });
+      const logoId = workbook.addImage({ filename: logoPath, extension: 'png' });
       worksheet.addImage(logoId, 'A1:B2');
     }
 
-    // Row 1: Header
-    worksheet.mergeCells('C1', 'H1');
-    worksheet.getCell('C1').value = 'Cor Jesu College - Payroll System';
+    // ── Row 1: Title ──
+    worksheet.mergeCells('C1:K1');
+    worksheet.getCell('C1').value = 'Cor Jesu College – Payroll System';
     worksheet.getCell('C1').font = { size: 16, bold: true };
     worksheet.getCell('C1').alignment = { vertical: 'middle', horizontal: 'center' };
-    worksheet.getRow(1).height = 30;
+    worksheet.getRow(1).height = 32;
 
-    // Row 2: Sub-Heading
-    worksheet.mergeCells('C2', 'H2');
-    worksheet.getCell('C2').value = `Payroll Period: ${period || 'All'} | Generated: ${date || moment().format('YYYY-MM-DD')}`;
-    worksheet.getCell('C2').font = { size: 12, italic: true };
+    // ── Row 2: Sub-heading ──
+    worksheet.mergeCells('C2:K2');
+    const periodLabel = period ? period.charAt(0).toUpperCase() + period.slice(1) : 'All';
+    worksheet.getCell('C2').value =
+      `Period: ${periodLabel}  |  ${startStr || '—'} to ${endStr || '—'}  |  Generated: ${moment().tz(PH_TZ).format('YYYY-MM-DD')}`;
+    worksheet.getCell('C2').font = { size: 11, italic: true };
     worksheet.getCell('C2').alignment = { vertical: 'middle', horizontal: 'center' };
+    worksheet.getRow(2).height = 22;
 
-    worksheet.addRow([]); // Blank Row 3
+    worksheet.addRow([]); // blank row 3
 
-    // Headers
+    // ── Row 4: Column Headers ──
     const headers = [
-      'Name', 'Employee Type', 'Days/Hours Worked',
-      'Hourly Rate', 'Gross Pay', 'Cash Advance Deduction',
-      'Net Pay', 'Received By'
+      'Name', 'Area / Dept.', 'Daily Rate', 'Hourly Rate',
+      'Days Worked', 'Hours Worked', 'Gross Pay',
+      'SSS', 'PhilHealth', 'Net Pay', 'Signature / Received By'
     ];
     const headerRow = worksheet.addRow(headers);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.height = 22;
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
     headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
     headerRow.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F81BD' } };
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } };
+      cell.border = {
+        top: { style: 'medium' }, left: { style: 'thin' },
+        bottom: { style: 'medium' }, right: { style: 'thin' }
+      };
     });
 
-    // Adjust Columns
-    worksheet.columns = [
-      { width: 25 }, { width: 15 }, { width: 15 },
-      { width: 15 }, { width: 15 }, { width: 20 },
-      { width: 15 }, { width: 30 }
-    ];
-
-    // Add Rows
+    // ── Data rows ──
     payrolls.forEach(p => {
+      const u = userMap[p.userId];
+      const department  = (u && u.department) ? u.department : '—';
+      const requiredHrs = (u && u.requiredHours) ? u.requiredHours : 8;
+      const hourlyRate  = p.baseRate || 0;
+      const dailyRate   = hourlyRate * requiredHrs;
+      const daysWorked  = daysWorkedMap[p.id] || 0;
+      const grossPay    = p.grossPay   || 0;
+      const netPay      = p.netPay     || grossPay;
+
       const row = worksheet.addRow([
         p.userName,
-        (p.userType || '').charAt(0).toUpperCase() + (p.userType || '').slice(1),
-        p.totalHours.toFixed(2),
-        `₱${(p.baseRate || 0).toFixed(2)}`,
-        `₱${p.grossPay.toFixed(2)}`,
-        `₱${(p.deductions || 0).toFixed(2)}`,
-        `₱${(p.netPay || p.grossPay).toFixed(2)}`,
-        '' // Signature line
+        department,
+        dailyRate.toFixed(2),
+        hourlyRate.toFixed(2),
+        daysWorked,
+        (p.totalHours || 0).toFixed(2),
+        grossPay.toFixed(2),
+        '', // SSS  — admin fills in
+        '', // PhilHealth — admin fills in
+        netPay.toFixed(2),
+        ''  // Signature
       ]);
 
-      row.eachCell((cell) => {
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      row.height = 20;
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+          top: { style: 'thin' }, left: { style: 'thin' },
+          bottom: { style: 'thin' }, right: { style: 'thin' }
+        };
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
       });
-      // specific alignments
-      row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
-      row.getCell(8).alignment = { vertical: 'bottom', horizontal: 'center' }; // for writing signature
+      row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };  // Name left-align
+      row.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' };  // Area left-align
+      row.getCell(11).font = { color: { argb: 'FFAAAAAA' } };                 // Signature hint
     });
 
-    const filename = `payroll-${period || 'custom'}-${date || moment().format('YYYY-MM-DD')}.xlsx`;
+    // ── Empty row + totals row ──
+    worksheet.addRow([]);
+    const totalRow = worksheet.addRow([
+      'TOTAL',                                                                              // 1  Name
+      '',                                                                                   // 2  Area (blank)
+      '',                                                                                   // 3  Daily Rate (blank)
+      '',                                                                                   // 4  Hourly Rate (blank)
+      payrolls.reduce((s, p) => s + (daysWorkedMap[p.id] || 0), 0),                        // 5  Days Worked total
+      payrolls.reduce((s, p) => s + (p.totalHours || 0), 0).toFixed(2),                    // 6  Hours Worked total
+      payrolls.reduce((s, p) => s + (p.grossPay   || 0), 0).toFixed(2),                    // 7  Gross Pay total
+      '',                                                                                   // 8  SSS — admin fills
+      '',                                                                                   // 9  PhilHealth — admin fills
+      payrolls.reduce((s, p) => s + (p.netPay || p.grossPay || 0), 0).toFixed(2),          // 10 Net Pay total
+      ''                                                                                    // 11 Signature (blank)
+    ]);
+    totalRow.font = { bold: true };
+    totalRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCE6F1' } };
+    totalRow.eachCell({ includeEmpty: true }, (cell) => {
+      cell.border = {
+        top: { style: 'medium' }, left: { style: 'thin' },
+        bottom: { style: 'medium' }, right: { style: 'thin' }
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+
+    const filename = `payroll-${period || 'custom'}-${date || moment().tz(PH_TZ).format('YYYY-MM-DD')}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
+    console.error('Export error:', err);
+    // Can't redirect after headers might have started — end cleanly
+    if (!res.headersSent) {
+      req.flash('error', 'Failed to export to Excel.');
+      res.redirect('/admin/payroll');
+    } else {
+      res.end();
+    }
+  }
+};
+
+// GET /admin/payroll/overview
+exports.getPayrollOverview = async (req, res) => {
+  try {
+    const { userType, search } = req.query;
+
+    let userQuery = { role: { not: 'admin' }, isActive: true };
+    if (userType) userQuery.role = userType;
+    if (search) {
+      userQuery.OR = [
+        { name:   { contains: search, mode: 'insensitive' } },
+        { userId: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const users = await prisma.user.findMany({ where: userQuery, orderBy: { name: 'asc' } });
+
+    // For each user, grab their latest payroll record
+    const overview = await Promise.all(users.map(async (u) => {
+      const latest = await prisma.payroll.findFirst({
+        where: { userId: u.userId },
+        orderBy: { createdAt: 'desc' }
+      });
+      const totalPayrolls = await prisma.payroll.count({ where: { userId: u.userId } });
+      const unpaidCount   = await prisma.payroll.count({ where: { userId: u.userId, isPaid: false } });
+      const totalNetPaid  = await prisma.payroll.aggregate({
+        _sum: { netPay: true },
+        where: { userId: u.userId, isPaid: true }
+      });
+      // Pending cash advances
+      const pendingAdv = await prisma.cashAdvance.aggregate({
+        _sum: { amount: true },
+        _count: { id: true },
+        where: { employeeId: u.id, status: 'pending' }
+      });
+
+      return {
+        userId: u.userId,
+        userName: u.name,
+        role: u.role,
+        department: u.department || '—',
+        hourlyRate: u.hourlyRate,
+        totalPayrolls,
+        unpaidCount,
+        totalNetPaid: totalNetPaid._sum.netPay || 0,
+        pendingAdvanceAmount: pendingAdv._sum.amount || 0,
+        pendingAdvanceCount: pendingAdv._count.id || 0,
+        latest: latest ? { ...latest, _id: latest.id } : null
+      };
+    }));
+
+    res.render('admin/payroll-overview', {
+      title: 'Payroll Overview',
+      overview,
+      userType: userType || '',
+      search: search || '',
+      user: req.session.user
+    });
+  } catch (err) {
     console.error(err);
-    req.flash('error', 'Failed to export to Excel.');
     res.redirect('/admin/payroll');
   }
 };

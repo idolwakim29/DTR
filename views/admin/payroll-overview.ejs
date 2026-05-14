@@ -1,0 +1,154 @@
+<%- include('../partials/admin-header') %>
+
+<div class="card" style="margin-bottom:20px;">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-id-card-alt" style="color:var(--red);margin-right:8px"></i>Payroll Overview</h3>
+    <a href="/admin/payroll" class="btn btn-outline btn-sm"><i class="fas fa-list"></i> All Records</a>
+  </div>
+  <div class="filter-bar">
+    <form method="GET" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;width:100%;">
+      <input type="text" name="search" class="form-control" placeholder="Search name or ID..."
+        value="<%= search %>" style="width:200px;">
+      <select name="userType" class="form-select" style="width:180px;">
+        <option value="">All Types</option>
+        <option value="maintenance" <%= userType === 'maintenance' ? 'selected' : '' %>>Maintenance</option>
+        <option value="student"     <%= userType === 'student'     ? 'selected' : '' %>>Student</option>
+      </select>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
+      <a href="/admin/payroll/overview" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
+    </form>
+  </div>
+</div>
+
+<% if (overview.length === 0) { %>
+<div class="card">
+  <div class="empty-state"><i class="fas fa-users"></i><p>No employees found.</p></div>
+</div>
+<% } else { %>
+
+<!-- Summary bar -->
+<div class="stats-grid" style="margin-bottom:20px;">
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+    <div>
+      <div class="stat-value"><%= overview.length %></div>
+      <div class="stat-label">Total Employees</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon red"><i class="fas fa-clock"></i></div>
+    <div>
+      <div class="stat-value"><%= overview.filter(o => o.unpaidCount > 0).length %></div>
+      <div class="stat-label">With Unpaid Payroll</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+    <div>
+      <div class="stat-value"><%= overview.filter(o => o.totalPayrolls > 0 && o.unpaidCount === 0).length %></div>
+      <div class="stat-label">Fully Settled</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange"><i class="fas fa-hand-holding-usd"></i></div>
+    <div>
+      <div class="stat-value"><%= overview.filter(o => o.pendingAdvanceCount > 0).length %></div>
+      <div class="stat-label">With Pending Cash Adv.</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Type</th>
+          <th>Dept / Area</th>
+          <th>Rate</th>
+          <th>Total Payrolls</th>
+          <th>Unpaid</th>
+          <th>Total Earned</th>
+          <th>Cash Advance</th>
+          <th>Latest Payroll</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% overview.forEach(o => { %>
+        <tr>
+          <td>
+            <strong><%= o.userName %></strong><br>
+            <small style="color:var(--gray-500)"><%= o.userId %></small>
+          </td>
+          <td>
+            <span class="badge <%= o.role === 'student' ? 'badge-blue' : 'badge-orange' %>">
+              <i class="fas <%= o.role === 'student' ? 'fa-user-graduate' : 'fa-hard-hat' %>"></i>
+              <%= o.role.charAt(0).toUpperCase() + o.role.slice(1) %>
+            </span>
+          </td>
+          <td><%= o.department %></td>
+          <td><strong style="color:var(--success)">₱<%= o.hourlyRate.toFixed(2) %>/hr</strong></td>
+          <td style="text-align:center"><strong><%= o.totalPayrolls %></strong></td>
+          <td style="text-align:center">
+            <% if (o.unpaidCount > 0) { %>
+              <span class="badge badge-red"><i class="fas fa-clock"></i> <%= o.unpaidCount %> Unpaid</span>
+            <% } else if (o.totalPayrolls === 0) { %>
+              <span style="color:var(--gray-400)">—</span>
+            <% } else { %>
+              <span class="badge badge-green"><i class="fas fa-check"></i> All Paid</span>
+            <% } %>
+          </td>
+          <td><strong style="color:var(--success)">₱<%= o.totalNetPaid.toFixed(2) %></strong></td>
+          <td>
+            <% if (o.pendingAdvanceCount > 0) { %>
+              <span class="badge badge-orange">
+                <i class="fas fa-hand-holding-usd"></i>
+                ₱<%= o.pendingAdvanceAmount.toFixed(2) %>
+              </span>
+            <% } else { %>
+              <span style="color:var(--gray-400)">—</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (o.latest) { %>
+              <small style="color:var(--gray-500)"><%= o.latest.periodType || '—' %></small><br>
+              <small style="color:var(--gray-500);font-size:10px"><%= o.latest.periodStart %> – <%= o.latest.periodEnd %></small>
+            <% } else { %>
+              <span style="color:var(--gray-400)">No payroll yet</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (o.latest) { %>
+              <span class="badge <%= o.latest.isPaid ? 'badge-green' : 'badge-red' %>">
+                <i class="fas <%= o.latest.isPaid ? 'fa-check' : 'fa-clock' %>"></i>
+                <%= o.latest.isPaid ? 'Paid' : 'Unpaid' %>
+              </span>
+            <% } else { %>
+              <span class="badge badge-gray">No Record</span>
+            <% } %>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <a href="/admin/payroll?search=<%= o.userId %>" class="btn btn-sm btn-outline" title="View Payrolls">
+                <i class="fas fa-list"></i>
+              </a>
+              <a href="/admin/payroll/generate" class="btn btn-sm btn-primary" title="Generate Payroll">
+                <i class="fas fa-plus"></i>
+              </a>
+              <a href="/admin/cash-advances?search=<%= o.userId %>" class="btn btn-sm btn-secondary" title="Cash Advances">
+                <i class="fas fa-hand-holding-usd"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
+
+<%- include('../partials/admin-footer') %>

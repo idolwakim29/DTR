@@ -6,7 +6,7 @@ exports.getLogin = (req, res) => {
   if (req.session.user) {
     return res.redirect(req.session.user.role === 'admin' ? '/admin/dashboard' : '/dtr/me');
   }
-  res.render('auth/login', { title: 'Login', error: req.flash('error') });
+  res.render('auth/login', { title: 'Login' });
 };
 
 // POST /login

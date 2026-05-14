@@ -44,6 +44,7 @@ router.post('/admin/dtr/delete/:id', isAuthenticated, isAdmin, dtrController.del
 
 // Admin – Payroll
 router.get('/admin/payroll',               isAuthenticated, isAdmin, adminController.getPayroll);
+router.get('/admin/payroll/overview',      isAuthenticated, isAdmin, adminController.getPayrollOverview);
 router.get('/admin/payroll/generate',      isAuthenticated, isAdmin, adminController.getGeneratePayroll);
 router.post('/admin/payroll/generate',     isAuthenticated, isAdmin, adminController.postGeneratePayroll);
 router.get('/admin/payroll/export',        isAuthenticated, isAdmin, adminController.exportPayrollExcel);
@@ -51,8 +52,9 @@ router.post('/admin/payroll/pay/:id',      isAuthenticated, isAdmin, adminContro
 router.post('/admin/payroll/delete/:id',   isAuthenticated, isAdmin, adminController.deletePayroll);
 
 // Admin - Cash Advances
-router.get('/admin/cash-advances',             isAuthenticated, isAdmin, cashAdvanceController.getList);
-router.post('/admin/cash-advances',            isAuthenticated, isAdmin, cashAdvanceController.postCreate);
-router.post('/admin/cash-advances/deduct/:id', isAuthenticated, isAdmin, cashAdvanceController.postMarkDeducted);
+router.get('/admin/cash-advances',               isAuthenticated, isAdmin, cashAdvanceController.getList);
+router.post('/admin/cash-advances',              isAuthenticated, isAdmin, cashAdvanceController.postCreate);
+router.post('/admin/cash-advances/deduct/:id',   isAuthenticated, isAdmin, cashAdvanceController.postMarkDeducted);
+router.post('/admin/cash-advances/delete/:id',   isAuthenticated, isAdmin, cashAdvanceController.postDelete);
 
 module.exports = router;

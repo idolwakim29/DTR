@@ -51,6 +51,10 @@
         class="nav-item <%= title === 'Payroll' || title === 'Generate Payroll' ? 'active' : '' %>">
         <i class="fas fa-money-bill-wave"></i><span>Payroll</span>
       </a>
+      <a href="/admin/payroll/overview"
+        class="nav-item <%= title === 'Payroll Overview' ? 'active' : '' %>">
+        <i class="fas fa-id-card-alt"></i><span>Payroll Overview</span>
+      </a>
       <a href="/admin/cash-advances" class="nav-item <%= title === 'Cash Advances' ? 'active' : '' %>">
         <i class="fas fa-hand-holding-usd"></i><span>Cash Advances</span>
       </a>
@@ -88,13 +92,13 @@
     </header>
 
     <div class="content-area">
-      <% if (typeof error !=='undefined' && error && error.length> 0) { %>
+      <% if (typeof error !== 'undefined' && error && error.length > 0) { %>
         <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i>
-          <%= error %>
+          <%= error[0] %>
         </div>
-        <% } %>
-          <% if (typeof success !=='undefined' && success && success.length> 0) { %>
-            <div class="alert alert-success"><i class="fas fa-check-circle"></i>
-              <%= success %>
-            </div>
-            <% } %>
+      <% } %>
+      <% if (typeof success !== 'undefined' && success && success.length > 0) { %>
+        <div class="alert alert-success"><i class="fas fa-check-circle"></i>
+          <%= success[0] %>
+        </div>
+      <% } %>

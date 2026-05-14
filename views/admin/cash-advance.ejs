@@ -1,16 +1,30 @@
 <%- include('../partials/admin-header') %>
 
+<!-- Header + Add button -->
 <div class="card" style="margin-bottom:20px;">
-  <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
-    <h3 class="card-title"><i class="fas fa-hand-holding-usd" style="color:var(--primary);margin-right:8px"></i>Cash Advances</h3>
-    <button class="btn btn-primary" onclick="document.getElementById('addAdvanceModal').style.display='block'">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-hand-holding-usd" style="color:var(--red);margin-right:8px"></i>Cash Advances</h3>
+    <button class="btn btn-primary" onclick="document.getElementById('addAdvanceModal').style.display='flex'">
       <i class="fas fa-plus"></i> Add Advance
     </button>
   </div>
+  <!-- Search filter -->
+  <div class="filter-bar">
+    <form method="GET" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;width:100%;">
+      <input type="text" name="search" class="form-control" placeholder="Search employee name or ID..."
+        value="<%= search %>" style="width:260px;">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
+      <a href="/admin/cash-advances" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
+    </form>
+  </div>
 </div>
 
+<!-- Records table -->
 <div class="card">
   <div class="table-wrap">
+    <% if (advances.length === 0) { %>
+      <div class="empty-state"><i class="fas fa-hand-holding-usd"></i><p>No cash advance records found.</p></div>
+    <% } else { %>
     <table>
       <thead>
         <tr>
@@ -18,79 +32,122 @@
           <th>Employee</th>
           <th>Amount</th>
           <th>Target Payroll Date</th>
-          <th>Status</th>
           <th>Notes</th>
+          <th>Status</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        <% if (advances.length === 0) { %>
-          <tr><td colspan="7" style="text-align:center;">No cash advances found.</td></tr>
-        <% } %>
         <% advances.forEach(ca => { %>
         <tr>
-          <td><%= new Date(ca.dateRequested).toLocaleDateString() %></td>
+          <td><%= new Date(ca.dateRequested).toLocaleDateString('en-PH') %></td>
           <td>
             <% if (ca.employeeId) { %>
               <strong><%= ca.employeeId.name %></strong><br>
               <small style="color:var(--gray-500)"><%= ca.employeeId.userId %></small>
             <% } else { %>
-              <span style="color:var(--gray-500)">Unknown User</span>
+              <span style="color:var(--gray-500)">Unknown Employee</span>
             <% } %>
           </td>
-          <td><strong>₱<%= ca.amount.toFixed(2) %></strong></td>
-          <td><%= new Date(ca.targetPayrollDate).toLocaleDateString() %></td>
+          <td><strong style="color:var(--danger)">₱<%= ca.amount.toFixed(2) %></strong></td>
           <td>
-            <% if (ca.status === 'pending') { %>
-              <span class="badge badge-red">Pending</span>
+            <% if (ca.targetPayrollDate) { %>
+              <%= new Date(ca.targetPayrollDate).toLocaleDateString('en-PH') %>
             <% } else { %>
-              <span class="badge badge-green">Deducted</span>
+              <span style="color:var(--gray-400)">—</span>
             <% } %>
           </td>
-          <td><span style="color:var(--gray-500); font-size: 0.9em;"><%= ca.notes || '-' %></span></td>
+          <td><span style="color:var(--gray-500);font-size:0.9em"><%= ca.notes || '—' %></span></td>
           <td>
             <% if (ca.status === 'pending') { %>
-              <form action="/admin/cash-advances/deduct/<%= ca._id %>" method="POST" style="display:inline;">
-                <button type="submit" class="btn btn-sm btn-outline"><i class="fas fa-check"></i> Mark Deducted</button>
-              </form>
+              <span class="badge badge-red"><i class="fas fa-clock"></i> Pending</span>
+            <% } else { %>
+              <span class="badge badge-green"><i class="fas fa-check"></i> Deducted</span>
+              <% if (ca.deductedOn) { %>
+                <br><small style="color:var(--gray-500);font-size:10px"><%= new Date(ca.deductedOn).toLocaleDateString('en-PH') %></small>
+              <% } %>
             <% } %>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <% if (ca.status === 'pending') { %>
+              <form action="/admin/cash-advances/deduct/<%= ca._id %>" method="POST"
+                    onsubmit="return confirm('Mark this advance as deducted?')">
+                <button type="submit" class="btn btn-sm btn-success" title="Mark Deducted">
+                  <i class="fas fa-check"></i>
+                </button>
+              </form>
+              <% } %>
+              <form action="/admin/cash-advances/delete/<%= ca._id %>" method="POST"
+                    onsubmit="return confirm('Delete this cash advance record? This cannot be undone.')">
+                <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
+            </div>
           </td>
         </tr>
         <% }) %>
       </tbody>
     </table>
+    <% } %>
   </div>
 </div>
 
-<!-- Add Advance Modal Elements (Simple custom modal) -->
-<div id="addAdvanceModal" class="modal" style="display:none; position:fixed; z-index:999; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5);">
-  <div class="modal-content" style="background-color:#fff; margin:10% auto; padding:20px; border-radius:8px; width:400px; max-width:90%;">
-    <h3 style="margin-top:0;">Add Cash Advance</h3>
+<!-- ── Add Advance Modal ── -->
+<div id="addAdvanceModal" style="display:none;position:fixed;z-index:999;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;"
+     onclick="if(event.target===this) this.style.display='none'">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:440px;max-width:94%;box-shadow:0 20px 60px rgba(0,0,0,.25);"
+       onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <h3 style="margin:0;font-size:17px;font-weight:800;">
+        <i class="fas fa-hand-holding-usd" style="color:var(--red);margin-right:8px;"></i>Add Cash Advance
+      </h3>
+      <button onclick="document.getElementById('addAdvanceModal').style.display='none'"
+        style="background:none;border:none;cursor:pointer;color:var(--gray-400);font-size:20px;">&times;</button>
+    </div>
+
     <form action="/admin/cash-advances" method="POST">
-      <div class="form-group" style="margin-bottom:15px;">
-        <label>Employee</label>
-        <select name="employeeId" class="form-control" required style="width:100%; padding:8px;">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">Employee</label>
+        <select name="employeeId" class="form-select" required style="width:100%;">
           <option value="">Select Employee...</option>
-          <% users.forEach(u => { %>
-            <option value="<%= u._id %>"><%= u.name %> (<%= u.userId %>)</option>
-          <% }) %>
+          <% const maint = users.filter(u => u.role === 'maintenance');
+             const studs = users.filter(u => u.role === 'student'); %>
+          <% if (maint.length > 0) { %>
+          <optgroup label="Maintenance Staff">
+            <% maint.forEach(u => { %>
+              <option value="<%= u._id %>"><%= u.name %> (<%= u.userId %>)</option>
+            <% }) %>
+          </optgroup>
+          <% } %>
+          <% if (studs.length > 0) { %>
+          <optgroup label="Students">
+            <% studs.forEach(u => { %>
+              <option value="<%= u._id %>"><%= u.name %> (<%= u.userId %>)</option>
+            <% }) %>
+          </optgroup>
+          <% } %>
         </select>
       </div>
-      <div class="form-group" style="margin-bottom:15px;">
-        <label>Amount</label>
-        <input type="number" name="amount" min="1" step="0.01" class="form-control" required style="width:100%; padding:8px;">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">Amount (₱)</label>
+        <input type="number" name="amount" min="1" step="0.01" class="form-control" required
+          placeholder="e.g. 500.00" style="width:100%;">
       </div>
-      <div class="form-group" style="margin-bottom:15px;">
-        <label>Target Payroll Date</label>
-        <input type="date" name="targetPayrollDate" class="form-control" required style="width:100%; padding:8px;">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">Target Payroll Date</label>
+        <input type="date" name="targetPayrollDate" class="form-control" required style="width:100%;">
       </div>
-      <div class="form-group" style="margin-bottom:15px;">
-        <label>Notes</label>
-        <textarea name="notes" class="form-control" rows="2" style="width:100%; padding:8px;"></textarea>
+      <div class="form-group" style="margin-bottom:20px;">
+        <label class="form-label">Notes <span style="color:var(--gray-400)">(optional)</span></label>
+        <textarea name="notes" class="form-control" rows="2" placeholder="Reason or remarks..."
+          style="width:100%;resize:vertical;"></textarea>
       </div>
-      <div style="display:flex; justify-content:flex-end; gap:10px;">
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('addAdvanceModal').style.display='none'">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Advance</button>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="btn btn-secondary"
+          onclick="document.getElementById('addAdvanceModal').style.display='none'">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Advance</button>
       </div>
     </form>
   </div>

@@ -22,10 +22,13 @@
   </div>
 
   <% if (typeof error !== 'undefined' && error && error.length > 0) { %>
-    <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <%= error %></div>
+    <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <%= error[0] %></div>
+  <% } %>
+  <% if (typeof warning !== 'undefined' && warning && warning.length > 0) { %>
+    <div class="alert alert-error" style="background:#fff7ed;border-color:#fb923c;color:#9a3412;"><i class="fas fa-clock"></i> <%= warning[0] %></div>
   <% } %>
   <% if (typeof success !== 'undefined' && success && success.length > 0) { %>
-    <div class="alert alert-success"><i class="fas fa-check-circle"></i> <%= success %></div>
+    <div class="alert alert-success"><i class="fas fa-check-circle"></i> <%= success[0] %></div>
   <% } %>
 
   <div class="dtr-card">
@@ -111,8 +114,8 @@
     <!-- Actions -->
     <div class="dtr-actions">
       <%
-        const canTimeIn   = !todayLog || !todayLog.timeIn;
-        const canTimeOut  = todayLog && todayLog.isActive && todayLog.status !== 'completed';
+        const canTimeIn  = !todayLog || !todayLog.timeIn || (todayLog.status !== 'completed' && !todayLog.isActive);
+        const canTimeOut = todayLog && todayLog.isActive && todayLog.status !== 'completed';
       %>
       <form action="/dtr/time-in" method="POST">
         <button type="submit" class="dtr-btn dtr-btn-in <%= canTimeIn ? '' : 'disabled' %>" <%= canTimeIn ? '' : 'disabled' %>>

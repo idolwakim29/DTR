@@ -62,6 +62,7 @@ model DTRLog {
   undertimeHours Float     @default(0)
   status         LogStatus @default(in_progress)
   late_afternoon Boolean   @default(false)
+  late_clockout  Boolean   @default(false)
   notes          String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -76,6 +77,7 @@ model CashAdvance {
   notes             String?
   status            CaStatus  @default(pending)
   dateRequested     DateTime  @default(now())
+  deductedOn        DateTime?
 }
 
 model Payroll {

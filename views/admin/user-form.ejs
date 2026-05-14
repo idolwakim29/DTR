@@ -9,9 +9,7 @@
     <a href="/admin/users" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> Back</a>
   </div>
   <div class="card-body">
-    <% if (error && error.length > 0) { %>
-      <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <%= error %></div>
-    <% } %>
+
 
     <form action="<%= editUser ? '/admin/users/edit/' + editUser._id : '/admin/users/new' %>" method="POST">
       <div class="form-row">

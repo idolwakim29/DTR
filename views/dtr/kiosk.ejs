@@ -68,6 +68,7 @@
     .reminder i { margin-top: 1px; flex-shrink: 0; }
 
     /* NEW: Afternoon late warning banner */
+    /* Late PM warning (clock-in) */
     .late-pm-warning {
       background: #fff7ed; border: 1px solid #fb923c; border-radius: 9px;
       padding: 12px 14px; font-size: 13px; color: #9a3412; margin-top: 12px;
@@ -76,6 +77,17 @@
     }
     .late-pm-warning.show { display: flex; }
     .late-pm-warning i { margin-top: 2px; flex-shrink: 0; font-size: 16px; color: #ea580c; }
+
+    /* Late Out warning (clock-out capped) */
+    .late-out-warning {
+      background: #fff7ed; border: 1px solid #fb923c; border-radius: 9px;
+      padding: 12px 14px; font-size: 13px; color: #9a3412; margin-top: 12px;
+      display: none; gap: 9px; align-items: flex-start; line-height: 1.5;
+      animation: fadeInDown .3s ease;
+    }
+    .late-out-warning.show { display: flex; }
+    .late-out-warning i { margin-top: 2px; flex-shrink: 0; font-size: 16px; color: #ea580c; }
+
     @keyframes fadeInDown {
       from { opacity: 0; transform: translateY(-6px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -122,7 +134,7 @@
     .otut-chip.ot   { background: var(--success-pale); color: var(--success); }
     .otut-chip.ut   { background: var(--danger-pale);  color: var(--danger); }
 
-    /* NEW: Late PM chip in emp card */
+    /* Late PM chip in emp card */
     .late-pm-chip {
       margin: 0 18px 14px; padding: 8px 12px; border-radius: 9px;
       background: #fff7ed; border: 1px solid #fb923c;
@@ -130,6 +142,15 @@
       text-align: center; display: none;
     }
     .late-pm-chip.show { display: block; }
+
+    /* Late Out chip in emp card */
+    .late-out-chip {
+      margin: 0 18px 14px; padding: 8px 12px; border-radius: 9px;
+      background: #fff7ed; border: 1px solid #fb923c;
+      font-size: 12px; font-weight: 700; color: #9a3412;
+      text-align: center; display: none;
+    }
+    .late-out-chip.show { display: block; }
 
     @media (max-width: 740px) {
       .dtr-layout { flex-direction: column; align-items: center; }
@@ -170,12 +191,21 @@
 
           <div id="alertBox"></div>
 
-          <!-- NEW: Afternoon late warning (shown after response) -->
+          <!-- Late PM warning (clock-in) -->
           <div class="late-pm-warning" id="latePmWarning">
             <i class="fas fa-clock"></i>
             <div>
               <strong>Late Afternoon Log-in</strong><br>
               <span id="latePmMsg">You logged in past the 1:30 PM cutoff.</span>
+            </div>
+          </div>
+
+          <!-- Late Out warning (clock-out capped) -->
+          <div class="late-out-warning" id="lateOutWarning">
+            <i class="fas fa-clock"></i>
+            <div>
+              <strong>Clock-Out Past Shift End</strong><br>
+              <span id="lateOutMsg">Your clock-out time was capped to shift end.</span>
             </div>
           </div>
 
@@ -211,7 +241,7 @@
           </div>
 
           <div style="margin-top: 12px; text-align: center;">
-            <a href="/logout" class="kbtn kbtn-admin" style="width: 100%; background: var(--gray-100); color: var(--gray-600); border: 1px solid var(--gray-300);">
+            <a href="/login" class="kbtn kbtn-admin" style="width: 100%; background: var(--gray-100); color: var(--gray-600); border: 1px solid var(--gray-300);">
               <i class="fas fa-cog"></i> Admin Panel
             </a>
           </div>
@@ -243,9 +273,14 @@
         <div class="emp-stamp" id="empStamp"></div>
         <div class="emp-otut" id="empOtUt" style="display:none;"></div>
 
-        <!-- NEW: Late PM chip in employee card -->
+        <!-- Late PM chip -->
         <div class="late-pm-chip" id="latePmChip">
-          <i class="fas fa-clock"></i> <span id="latePmChipMsg"></span>
+          <i class="fas fa-exclamation-triangle"></i> <span id="latePmChipMsg"></span>
+        </div>
+
+        <!-- Late Out chip -->
+        <div class="late-out-chip" id="lateOutChip">
+          <i class="fas fa-clock"></i> <span id="lateOutChipMsg"></span>
         </div>
 
         <div class="emp-times">
@@ -323,8 +358,8 @@
     if (!password) { showAlert('error', 'Please enter your password.'); document.getElementById('password').focus(); return; }
 
     busy = true; setBtns(true); clearAlert();
-    // NEW: hide late PM warning on new attempt
     hideLateWarning();
+    hideLateOutWarning();
 
     try {
       const res  = await fetch('/dtr/kiosk', {
@@ -340,9 +375,14 @@
           (data.totalHours ? `&nbsp; — &nbsp;Total: <strong>${data.totalHours} hrs</strong>` : ''));
         showEmpCard(data);
 
-        // NEW: show late afternoon warning if flagged
+        // Late afternoon clock-in warning
         if (data.isLateAfternoon && data.lateAfternoonMinutes > 0) {
           showLateWarning(data.lateAfternoonMinutes);
+        }
+
+        // Late clock-out / capped warning
+        if (data.lateClockout) {
+          showLateOutWarning(data.capped);
         }
 
         document.getElementById('password').value = '';
@@ -363,16 +403,24 @@
     busy = false; setBtns(false);
   }
 
-  // NEW: Late PM warning helpers
+  // Late PM warning helpers
   function showLateWarning(minutes) {
     const box = document.getElementById('latePmWarning');
     document.getElementById('latePmMsg').textContent =
-      `You logged in ${minutes} minute${minutes !== 1 ? 's' : ''} past the 1:30 PM cutoff. This will be recorded and may affect your pay.`;
+      `You logged in ${minutes} minute${minutes !== 1 ? 's' : ''} past the cutoff. This will be recorded and may affect your pay.`;
     box.classList.add('show');
   }
-  function hideLateWarning() {
-    document.getElementById('latePmWarning').classList.remove('show');
+  function hideLateWarning() { document.getElementById('latePmWarning').classList.remove('show'); }
+
+  // Late Out warning helpers
+  function showLateOutWarning(capped) {
+    const box = document.getElementById('lateOutWarning');
+    document.getElementById('lateOutMsg').textContent = capped
+      ? `Your clock-out was past shift end. Time was capped to the shift end time — no overtime recorded.`
+      : `Your clock-out was slightly past shift end and has been flagged for review.`;
+    box.classList.add('show');
   }
+  function hideLateOutWarning() { document.getElementById('lateOutWarning').classList.remove('show'); }
 
   // ── Employee card ──
   function showEmpCard(data) {
@@ -430,7 +478,7 @@
       otutDiv.style.display = 'none';
     }
 
-    // NEW: Late PM chip in employee card
+    // Late PM chip
     const lateChip = document.getElementById('latePmChip');
     if (data.isLateAfternoon && data.lateAfternoonMinutes > 0) {
       document.getElementById('latePmChipMsg').textContent =
@@ -438,6 +486,16 @@
       lateChip.classList.add('show');
     } else {
       lateChip.classList.remove('show');
+    }
+
+    // Late Out chip
+    const lateOutChip = document.getElementById('lateOutChip');
+    if (data.lateClockout) {
+      document.getElementById('lateOutChipMsg').textContent =
+        data.capped ? 'Time capped to shift end' : 'Clocked out past shift end';
+      lateOutChip.classList.add('show');
+    } else {
+      lateOutChip.classList.remove('show');
     }
 
     // Stamp
