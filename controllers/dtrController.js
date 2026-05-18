@@ -1,133 +1,14 @@
 const prisma = require('../prismaClient');
 const moment = require('moment-timezone');
-const PH_TZ = 'Asia/Manila';
-
-function timeOfDay() {
-  const h = moment().tz(PH_TZ).hour(); // use PH local hour, not UTC
-  if (h < 12) return 'morning';
-  if (h < 18) return 'afternoon';
-  return 'evening';
-}
-
-function handleAfternoonCutoff(nowDate) {
-  const cutoffStr = process.env.AFTERNOON_CUTOFF || '13:30';
-  const [cutoffH, cutoffM] = cutoffStr.split(':').map(Number);
-
-  // Morning restriction: block unrealistically early clock-ins (default: before 6:00 AM)
-  const morningStartHour = parseInt(process.env.MORNING_START_HOUR || '6', 10);
-  const mNow = moment.tz(nowDate, PH_TZ);  // interpret in PH time
-
-  if (mNow.hour() < morningStartHour) {
-    return { isClosed: true, lateAfternoon: false, effectiveTime: nowDate,
-             message: `Clock-in is not allowed before ${morningStartHour}:00 AM.` };
-  }
-
-  const cutoffTime = moment.tz(nowDate, PH_TZ).hour(cutoffH).minute(cutoffM).second(0).millisecond(0);
-
-  if (mNow.hour() >= 12) {
-    if (mNow.isAfter(cutoffTime)) {
-      const minutesLate = mNow.diff(cutoffTime, 'minutes');
-      if (minutesLate >= 60) {   // fixed: was > 60, now >= 60 so exactly 60 min late is also blocked
-        return { isClosed: true, lateAfternoon: false, effectiveTime: nowDate,
-                 message: 'Afternoon log-in window closed. Contact your administrator.' };
-      }
-      return { isClosed: false, lateAfternoon: true, effectiveTime: cutoffTime.toDate() };
-    }
-  }
-  return { isClosed: false, lateAfternoon: false, effectiveTime: nowDate };
-}
-
-function handleShiftEndCutoff(nowDate) {
-  const shiftEndStr = process.env.SHIFT_END || '17:00';
-  const [endH, endM] = shiftEndStr.split(':').map(Number);
-  const graceMinutes = parseInt(process.env.LATE_CLOCKOUT_WINDOW || '30', 10);
-
-  const mNow = moment.tz(nowDate, PH_TZ);  // interpret in PH time
-  const shiftEndTime = moment.tz(nowDate, PH_TZ).hour(endH).minute(endM).second(0).millisecond(0);
-
-  // Only applies when clocking out AFTER the official shift end
-  if (mNow.isAfter(shiftEndTime)) {
-    const minutesLate = mNow.diff(shiftEndTime, 'minutes');
-    if (minutesLate > graceMinutes) {
-      // Clocked out too late — cap timeOut to shift end so no false overtime
-      return {
-        effectiveTime: shiftEndTime.toDate(),
-        lateClockout: true,
-        capped: true,
-        message: `Your clock-out time was capped to ${shiftEndStr} (you were ${minutesLate} min past shift end).`
-      };
-    }
-    // Within grace window — keep actual time but flag it
-    return { effectiveTime: nowDate, lateClockout: true, capped: false, message: null };
-  }
-
-  return { effectiveTime: nowDate, lateClockout: false, capped: false, message: null };
-}
-
-const excludeLunchTime = (timeIn, timeOut) => {
-  const LUNCH_START = 12; // 12 PM PH time
-  const LUNCH_END = 13;   // 1 PM PH time
-
-  if (!timeIn || !timeOut) return 0;
-
-  const start = new Date(timeIn);
-  const end   = new Date(timeOut);
-
-  // IMPORTANT: use PH timezone hours — getHours() returns UTC on Vercel servers
-  const startHour = moment.tz(start, PH_TZ).hour() + moment.tz(start, PH_TZ).minute() / 60;
-  const endHour   = moment.tz(end,   PH_TZ).hour() + moment.tz(end,   PH_TZ).minute() / 60;
-
-  // Duration in hours (millisecond arithmetic is timezone-agnostic — always correct)
-  const rawHours = (end - start) / (1000 * 60 * 60);
-
-  if (endHour <= LUNCH_START || startHour >= LUNCH_END) {
-    return rawHours;
-  }
-  if (startHour <= LUNCH_START && endHour >= LUNCH_END) {
-    return rawHours - 1;
-  }
-  if (startHour < LUNCH_START && endHour > LUNCH_START) {
-    const lunchOverlap = Math.min(endHour, LUNCH_END) - LUNCH_START;
-    return rawHours - lunchOverlap;
-  }
-  if (startHour < LUNCH_END && endHour > LUNCH_END) {
-    const lunchOverlap = LUNCH_END - Math.max(startHour, LUNCH_START);
-    return rawHours - lunchOverlap;
-  }
-  return rawHours;
-};
-
-function calculateTotals(logData) {
-  let total = 0;
-  if (logData.timeIn && logData.timeOut) {
-    total += excludeLunchTime(logData.timeIn, logData.timeOut);
-  }
-  let sessions = logData.sessions || [];
-  if (typeof sessions === 'string') {
-    try {
-      sessions = JSON.parse(sessions);
-    } catch (e) { }
-  }
-  sessions.forEach(s => {
-    if (s.timeIn && s.timeOut) {
-      const h = excludeLunchTime(s.timeIn, s.timeOut);
-      s.hours = Math.round(h * 100) / 100;
-      total += h;
-    }
-  });
-
-  const totalHours = Math.round(total * 100) / 100;
-  const req = logData.requiredHours || 8;
-  let overtimeHours = 0;
-  let undertimeHours = 0;
-
-  if (totalHours >= req) {
-    overtimeHours = Math.round((totalHours - req) * 100) / 100;
-  } else {
-    undertimeHours = Math.round((req - totalHours) * 100) / 100;
-  }
-  return { totalHours, overtimeHours, undertimeHours, sessions };
-}
+const {
+  timeOfDay,
+  handleAfternoonCutoff,
+  handleShiftEndCutoff,
+  excludeLunchTime,
+  calculateTotals,
+  PH_TZ
+} = require('../utils/timeUtils');
+const ExcelJS = require('exceljs');
 
 // PUBLIC KIOSK
 exports.getKiosk = (req, res) => {
@@ -612,5 +493,106 @@ exports.getAbsenceSummary = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.redirect('/admin/dashboard');
+  }
+};
+
+exports.exportSummaryExcel = async (req, res) => {
+  try {
+    const { userType = 'student', dateFrom, dateTo, userId } = req.query;
+    const from = dateFrom || moment().tz(PH_TZ).startOf('month').format('YYYY-MM-DD');
+    const to = dateTo || moment().tz(PH_TZ).format('YYYY-MM-DD');
+
+    let query = { userType, date: { gte: from, lte: to } };
+    if (userId) query.userId = userId;
+
+    const logs = await prisma.dTRLog.findMany({ where: query, orderBy: { date: 'asc' } });
+    const byEmployee = {};
+
+    logs.forEach(log => {
+      if (!byEmployee[log.userId]) {
+        byEmployee[log.userId] = {
+          userId: log.userId, userName: log.userName,
+          distinctDays: new Set(), totalHours: 0, overtimeHours: 0, undertimeHours: 0
+        };
+      }
+      const e = byEmployee[log.userId];
+      e.distinctDays.add(log.date);
+      e.totalHours += log.totalHours || 0;
+      e.overtimeHours += log.overtimeHours || 0;
+      e.undertimeHours += log.undertimeHours || 0;
+    });
+
+    const startObj = moment(from);
+    const endObj = moment(to);
+    let scheduledDays = 0;
+    if (endObj.diff(startObj, 'days') >= 0) {
+      scheduledDays = endObj.diff(startObj, 'days') + 1;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('DTR Summary');
+
+    worksheet.columns = [
+      { header: 'Name', key: 'name', width: 25 },
+      { header: 'ID', key: 'id', width: 15 },
+      { header: 'Batch / Role', key: 'role', width: 18 },
+      { header: 'Days Present', key: 'present', width: 15 },
+      { header: 'Absences', key: 'absences', width: 12 },
+      { header: 'Total Hours', key: 'total_hours', width: 15 },
+      { header: 'Overtime', key: 'overtime', width: 12 },
+      { header: 'Undertime', key: 'undertime', width: 12 }
+    ];
+
+    // Format header
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E79' } };
+      cell.border = {
+        top: { style: 'medium' }, left: { style: 'thin' },
+        bottom: { style: 'medium' }, right: { style: 'thin' }
+      };
+    });
+
+    Object.values(byEmployee)
+      .sort((a, b) => a.userName.localeCompare(b.userName))
+      .forEach(e => {
+        let absentDays = scheduledDays - e.distinctDays.size;
+        if (absentDays < 0) absentDays = 0;
+
+        const row = worksheet.addRow({
+          name: e.userName,
+          id: e.userId,
+          role: userType.toUpperCase(),
+          present: e.distinctDays.size,
+          absences: absentDays,
+          total_hours: (Math.round(e.totalHours * 100) / 100).toFixed(2),
+          overtime: (Math.round(e.overtimeHours * 100) / 100).toFixed(2),
+          undertime: (Math.round(e.undertimeHours * 100) / 100).toFixed(2)
+        });
+
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.border = {
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' }
+          };
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+        row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
+      });
+
+    const filename = `DTR_Summary_${userType}_${from}_to_${to}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('Export summary Excel error:', err);
+    if (!res.headersSent) {
+      req.flash('error', 'Failed to export DTR summary to Excel.');
+      res.redirect('/admin/dtr/summary');
+    } else {
+      res.end();
+    }
   }
 };

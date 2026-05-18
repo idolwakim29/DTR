@@ -18,6 +18,10 @@
         <label class="form-label">Employee *</label>
         <select name="userId" class="form-select" required>
           <option value="">Select Employee</option>
+          <optgroup label="Batch Generation">
+            <option value="BATCH_MAINTENANCE">[ BATCH ] All Maintenance Staff</option>
+            <option value="BATCH_STUDENT">[ BATCH ] All Student Assistants</option>
+          </optgroup>
           <% const maintenance = users.filter(u => u.role === 'maintenance'); %>
           <% const students = users.filter(u => u.role === 'student'); %>
           <% if (maintenance.length > 0) { %>

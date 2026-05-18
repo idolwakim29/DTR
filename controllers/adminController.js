@@ -197,88 +197,108 @@ exports.getGeneratePayroll = async (req, res) => {
 exports.postGeneratePayroll = async (req, res) => {
   try {
     const { userId, periodType, periodStart, periodEnd } = req.body;
-    const userDoc = await prisma.user.findUnique({ where: { id: userId } });
-    if (!userDoc) {
-      req.flash('error', 'User not found.');
+    
+    let targetUsers = [];
+    if (userId === 'BATCH_STUDENT') {
+      targetUsers = await prisma.user.findMany({ where: { role: 'student', isActive: true } });
+    } else if (userId === 'BATCH_MAINTENANCE') {
+      targetUsers = await prisma.user.findMany({ where: { role: 'maintenance', isActive: true } });
+    } else {
+      const u = await prisma.user.findUnique({ where: { id: userId } });
+      if (u && u.role !== 'admin' && u.isActive) targetUsers.push(u);
+    }
+
+    if (targetUsers.length === 0) {
+      req.flash('error', 'No qualifying users found for payroll generation.');
       return res.redirect('/admin/payroll/generate');
     }
 
     const startStr = moment.tz(periodStart, PH_TZ).format('YYYY-MM-DD');
     const endStr   = moment.tz(periodEnd,   PH_TZ).format('YYYY-MM-DD');
 
-    // Prevent identical overlapping payroll generation
-    const existingPayroll = await prisma.payroll.findFirst({
-      where: {
-        userId: userDoc.userId,
-        periodStart: startStr,
-        periodEnd: endStr
-      }
-    });
+    let processedCount = 0;
+    let skippedCount = 0;
+    let messages = []; // Used to collect errors if single user mode
 
-    if (existingPayroll) {
-      req.flash('error', `A payroll record already exists for ${userDoc.name} spanning ${startStr} to ${endStr}.`);
-      return res.redirect('/admin/payroll/generate');
+    for (const userDoc of targetUsers) {
+      // Prevent identical overlapping payroll generation
+      const existingPayroll = await prisma.payroll.findFirst({
+        where: {
+          userId: userDoc.userId,
+          periodStart: startStr,
+          periodEnd: endStr
+        }
+      });
+
+      if (existingPayroll) {
+        skippedCount++;
+        messages.push(`Record already exists for ${userDoc.name}.`);
+        continue;
+      }
+
+      const logs = await prisma.dTRLog.findMany({
+        where: {
+          userId: userDoc.userId,
+          date: { gte: startStr, lte: endStr },
+          status: 'completed',
+          totalHours: { gt: 0 }
+        }
+      });
+
+      // even if no logs, we might generate a 0-hour payroll if they have cash advances (though unlikely). Let's skip if 0 logs and 0 advances? Let's just generate anyway for completeness, or only if logs>0
+      if (logs.length === 0) {
+        skippedCount++;
+        messages.push(`No completed DTR logs found for ${userDoc.name}.`);
+        continue;
+      }
+
+      const totalHours = logs.reduce((sum, l) => sum + (l.totalHours || 0), 0);
+      const totalOT = logs.reduce((sum, l) => sum + (l.overtimeHours || 0), 0);
+      const totalUT = logs.reduce((sum, l) => sum + (l.undertimeHours || 0), 0);
+      const totalSalary = Math.round(totalHours * userDoc.hourlyRate * 100) / 100;
+
+      // Handle Cash Advances
+      const pendingAdvances = await prisma.cashAdvance.findMany({
+        where: {
+          employeeId: userDoc.id,
+          status: 'pending',
+          targetPayrollDate: { gte: startStr, lte: endStr }
+        }
+      });
+      const cashAdvanceDeduction = pendingAdvances.reduce((sum, ca) => sum + ca.amount, 0);
+      const netPay = totalSalary - cashAdvanceDeduction;
+
+      await prisma.payroll.create({
+        data: {
+          userId: userDoc.userId,
+          userName: userDoc.name,
+          userType: userDoc.role,
+          periodType: periodType,
+          periodStart: startStr,
+          periodEnd: endStr,
+          totalHours: Math.round(totalHours * 100) / 100,
+          overtimeHours: Math.round(totalOT * 100) / 100,
+          undertimeHours: Math.round(totalUT * 100) / 100,
+          grossPay: totalSalary,
+          deductions: cashAdvanceDeduction,
+          netPay,
+          baseRate: userDoc.hourlyRate
+        }
+      });
+      processedCount++;
     }
 
-    const logs = await prisma.dTRLog.findMany({
-      where: {
-        userId: userDoc.userId,
-        date: { gte: startStr, lte: endStr },
-        status: 'completed',
-        totalHours: { gt: 0 }
-      }
-    });
+    if (processedCount === 0) {
+      // If we did a batch and 0 generated, or 1 and 0 generated
+      req.flash('error', `Failed to generate payroll. ${skippedCount} skipped. ` + (targetUsers.length === 1 ? messages.join(' ') : ''));
+      res.redirect('/admin/payroll/generate');
+    } else {
+      let msg = `Payroll generated successfully: ${processedCount} processed.`;
+      if (skippedCount > 0) msg += ` (${skippedCount} skipped)`;
+      req.flash('success', msg);
+      res.redirect('/admin/payroll');
+    }
 
-    const totalHours = logs.reduce((sum, l) => sum + (l.totalHours || 0), 0);
-    const totalOT = logs.reduce((sum, l) => sum + (l.overtimeHours || 0), 0);
-    const totalUT = logs.reduce((sum, l) => sum + (l.undertimeHours || 0), 0);
-    const totalSalary = Math.round(totalHours * userDoc.hourlyRate * 100) / 100;
-
-    // Check for any in-progress logs in the period (warn admin)
-    const incompleteLogs = await prisma.dTRLog.count({
-      where: {
-        userId: userDoc.userId,
-        date: { gte: startStr, lte: endStr },
-        status: 'in_progress'
-      }
-    });
-
-    // Handle Cash Advances
-    const pendingAdvances = await prisma.cashAdvance.findMany({
-      where: {
-        employeeId: userDoc.id,
-        status: 'pending',
-        targetPayrollDate: { gte: startStr, lte: endStr }
-      }
-    });
-    const cashAdvanceDeduction = pendingAdvances.reduce((sum, ca) => sum + ca.amount, 0);
-    const netPay = totalSalary - cashAdvanceDeduction;
-
-    await prisma.payroll.create({
-      data: {
-        userId: userDoc.userId,
-        userName: userDoc.name,
-        userType: userDoc.role,
-        periodType: periodType,
-        periodStart: startStr,
-        periodEnd: endStr,
-        totalHours: Math.round(totalHours * 100) / 100,
-        overtimeHours: Math.round(totalOT * 100) / 100,
-        undertimeHours: Math.round(totalUT * 100) / 100,
-        grossPay: totalSalary,
-        deductions: cashAdvanceDeduction,
-        netPay,
-        baseRate: userDoc.hourlyRate
-      }
-    });
-    // Note: cash advances are marked 'deducted' in markPaid(), not here,
-    // so the admin has a chance to review before committing payment.
-
-    const warnMsg = incompleteLogs > 0
-      ? ` (Note: ${incompleteLogs} incomplete log(s) were excluded.)`
-      : '';
-    req.flash('success', `Payroll generated: Net Pay ₱${netPay.toFixed(2)} for ${userDoc.name} — ${logs.length} completed day(s)${warnMsg}`);
-    res.redirect('/admin/payroll');
   } catch (err) {
     console.error(err);
     req.flash('error', 'Error generating payroll.');

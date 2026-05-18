@@ -36,6 +36,7 @@ router.post('/admin/users/delete/:id',isAuthenticated, isAdmin, adminController.
 // Admin – DTR
 router.get('/admin/absences',        isAuthenticated, isAdmin, dtrController.getAbsenceSummary);
 router.get('/admin/dtr/summary',     isAuthenticated, isAdmin, dtrController.getSummary);
+router.get('/admin/dtr/summary/export', isAuthenticated, isAdmin, dtrController.exportSummaryExcel);
 router.get('/admin/dtr/maintenance', isAuthenticated, isAdmin, dtrController.getMaintenanceDTR);
 router.get('/admin/dtr/students',    isAuthenticated, isAdmin, dtrController.getStudentDTR);
 router.get('/admin/dtr/edit/:id',    isAuthenticated, isAdmin, dtrController.getEditLog);
