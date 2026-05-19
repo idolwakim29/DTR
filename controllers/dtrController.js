@@ -305,7 +305,14 @@ exports.timeOut = async (req, res) => {
 
 exports.getMaintenanceDTR = async (req, res) => {
   try {
-    const { search, dateFrom, dateTo } = req.query;
+    let { search, dateFrom, dateTo } = req.query;
+    
+    if (Object.keys(req.query).length === 0) {
+      const today = moment().tz(PH_TZ).format('YYYY-MM-DD');
+      dateFrom = today;
+      dateTo = today;
+    }
+    
     let query = { userType: 'maintenance' };
     if (search) {
       query.OR = [{ userName: { contains: search, mode: 'insensitive' } }, { userId: { contains: search, mode: 'insensitive' } }];
@@ -326,7 +333,14 @@ exports.getMaintenanceDTR = async (req, res) => {
 
 exports.getStudentDTR = async (req, res) => {
   try {
-    const { search, dateFrom, dateTo } = req.query;
+    let { search, dateFrom, dateTo } = req.query;
+
+    if (Object.keys(req.query).length === 0) {
+      const today = moment().tz(PH_TZ).format('YYYY-MM-DD');
+      dateFrom = today;
+      dateTo = today;
+    }
+
     let query = { userType: 'student' };
     if (search) {
       query.OR = [{ userName: { contains: search, mode: 'insensitive' } }, { userId: { contains: search, mode: 'insensitive' } }];
