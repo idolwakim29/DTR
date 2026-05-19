@@ -77,7 +77,7 @@
                 <%= log.userType === 'student' ? 'Student' : 'Maintenance' %>
               </span>
             </td>
-            <td><%= log.timeIn ? new Date(log.timeIn).toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit'}) : '—' %></td>
+            <td><%= log.timeIn ? new Date(log.timeIn).toLocaleTimeString('en-PH', {timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit'}) : '—' %></td>
             <td>
               <span class="badge <%= log.status === 'completed' ? 'badge-green' : 'badge-orange' %>">
                 <%= log.status === 'completed' ? 'Completed' : 'In Progress' %>

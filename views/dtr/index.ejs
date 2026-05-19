@@ -70,7 +70,7 @@
           <span class="dtr-log-label"><i class="fas fa-sign-in-alt" style="color:var(--success);margin-right:5px"></i>Time In</span>
           <span class="dtr-log-value">
             <% if (todayLog && todayLog.timeIn) { %>
-              <span class="badge badge-green"><%= new Date(todayLog.timeIn).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) %></span>
+              <span class="badge badge-green"><%= new Date(todayLog.timeIn).toLocaleTimeString('en-PH',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit',second:'2-digit'}) %></span>
             <% } else { %>
               <span style="color:var(--gray-400)">Not yet recorded</span>
             <% } %>
@@ -81,7 +81,7 @@
           <span class="dtr-log-value">
             <% if (todayLog && todayLog.status === 'completed') { %>
               <% const lastOut = todayLog.sessions && todayLog.sessions.length > 0 ? todayLog.sessions[todayLog.sessions.length-1].timeOut : todayLog.timeOut; %>
-              <span class="badge badge-red"><%= lastOut ? new Date(lastOut).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—' %></span>
+              <span class="badge badge-red"><%= lastOut ? new Date(lastOut).toLocaleTimeString('en-PH',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '—' %></span>
             <% } else { %>
               <span style="color:var(--gray-400)">Not yet recorded</span>
             <% } %>

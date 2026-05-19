@@ -47,14 +47,14 @@
           <td><%= log.date %></td>
           <td>
             <% if (log.timeIn) { %>
-              <span class="badge badge-green"><%= new Date(log.timeIn).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}) %></span>
+              <span class="badge badge-green"><%= new Date(log.timeIn).toLocaleTimeString('en-PH',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit'}) %></span>
               <% if (log.late_afternoon) { %><br><span class="badge badge-orange" style="margin-top:4px;font-size:10px;"><i class="fas fa-exclamation-triangle"></i> Late PM</span><% } %>
             <% } else { %><span style="color:var(--gray-400)">—</span><% } %>
           </td>
           <td>
             <% const lastOut = log.sessions && log.sessions.length > 0 ? log.sessions[log.sessions.length-1].timeOut : log.timeOut; %>
             <% if (log.status === 'completed' && lastOut) { %>
-              <span class="badge badge-red"><%= new Date(lastOut).toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'}) %></span>
+              <span class="badge badge-red"><%= new Date(lastOut).toLocaleTimeString('en-PH',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit'}) %></span>
               <% if (log.late_clockout) { %><br><span class="badge badge-orange" style="margin-top:4px;font-size:10px;"><i class="fas fa-clock"></i> Late Out</span><% } %>
             <% } else if (!log.isActive && log.status !== 'completed') { %>
               <span class="badge badge-orange">On Break</span>
