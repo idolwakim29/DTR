@@ -9,7 +9,3 @@ exports.isAdmin = (req, res, next) => {
   res.status(403).render('error', { message: 'Access Denied. Admin only.', user: req.session.user });
 };
 
-exports.isStaff = (req, res, next) => {
-  if (req.session && req.session.user && req.session.user.role !== 'admin') return next();
-  res.redirect('/admin/dashboard');
-};

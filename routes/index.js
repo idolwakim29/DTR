@@ -3,7 +3,7 @@ const router  = express.Router();
 const authController  = require('../controllers/authController');
 const dtrController   = require('../controllers/dtrController');
 const adminController = require('../controllers/adminController');
-const { isAuthenticated, isAdmin, isStaff } = require('../middleware/auth');
+const { isAuthenticated, isAdmin } = require('../middleware/auth');
 const cashAdvanceController = require('../controllers/cashAdvanceController');
 
 // Auth
@@ -17,10 +17,6 @@ router.get('/dtr',             dtrController.getKiosk);
 router.post('/dtr/kiosk',      dtrController.postKiosk);
 router.get('/dtr/kiosk/recent',dtrController.getRecentLogs);
 
-// Session-based DTR (logged-in staff/students)
-router.get('/dtr/me',              isAuthenticated, isStaff, dtrController.getDTRPage);
-router.post('/dtr/time-in',        isAuthenticated, isStaff, dtrController.timeIn);
-router.post('/dtr/time-out',       isAuthenticated, isStaff, dtrController.timeOut);
 
 // Admin – Dashboard
 router.get('/admin/dashboard', isAuthenticated, isAdmin, adminController.getDashboard);
