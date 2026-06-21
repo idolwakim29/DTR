@@ -383,16 +383,13 @@ exports.exportPayrollExcel = async (req, res) => {
     let startStr, endStr;
 
     if (period && date) {
-      // Normalize period aliases to DB values
+      // Build date range as YYYY-MM-DD strings
+      const targetDate = moment(date);
       let dbPeriod = period;
       if (period === 'day')   dbPeriod = 'daily';
       if (period === 'week')  dbPeriod = 'weekly';
       if (period === 'month') dbPeriod = 'monthly';
 
-      query.periodType = dbPeriod;
-
-      // Build date range as YYYY-MM-DD strings
-      const targetDate = moment(date);
       if (dbPeriod === 'daily') {
         startStr = targetDate.format('YYYY-MM-DD');
         endStr   = targetDate.format('YYYY-MM-DD');
