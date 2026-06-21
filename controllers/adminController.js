@@ -401,8 +401,9 @@ exports.exportPayrollExcel = async (req, res) => {
         endStr   = moment(date).endOf('month').format('YYYY-MM-DD');
       }
       if (startStr && endStr) {
-        query.periodStart = { gte: startStr };
-        query.periodEnd   = { lte: endStr };
+        // Find ANY payroll that overlaps cleanly with the target window
+        query.periodStart = { lte: endStr };
+        query.periodEnd   = { gte: startStr };
       }
     }
 
